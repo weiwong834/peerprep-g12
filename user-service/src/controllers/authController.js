@@ -355,7 +355,17 @@ export const logout = async (req, res) => {
         message: "Username is required"
       });
     }
-  
+    
+    // validate new username
+    const usernameError = validateUsername(username);
+
+    if (usernameError) {
+      return res.status(400).json({
+        code: "INVALID_USERNAME",
+        message: usernameError
+      });
+    }
+
     // verify token
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
   
