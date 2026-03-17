@@ -1,2 +1,4 @@
 node_modules
 .env
+matching-service/run-tests.sh
+matching-service/test-client.ts
