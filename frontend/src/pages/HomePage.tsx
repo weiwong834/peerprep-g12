@@ -10,30 +10,21 @@ export default function HomePage() {
 
         <ul className="list-disc ml-5 text-slate-600 space-y-1">
           <li>what's implemented</li>
-          <li>for login u can login with any email/pw</li>
+          <li>login and sign up</li>
+          <li>for sign up verification (mock): user 123456</li>
           <li>
-            sign up(mock): cannot use email: taken@email.com, username: admin"
-          </li>
-          <li>
-            ^^ also i made it such that user can only enter the next field if
+            ^^ i made it such that user can only enter the next field if
             previous is verified.
-            <li>^ ++ live checking for field validity</li>
+          </li>
+          <li>^ ++ live checking for format validity (not uniqueness yet)</li>
+          <li>
+            can try to "find a match" in collab page to navigate to collab room
           </li>
           <li>
-            u can try to "find a match" in collab page to see how collab room
-            looks like
+            what's left for userservice: creation + integration of
+            email/username uniqueness, update pw, verify otp endpoints
           </li>
-          <li>
-            currently, havent implemented profile page, forget password at login
-            page
-          </li>
-          <li>
-            if u wanna test pages can also just change the url /login /signup
-            /home /collab /profile; currently, havent implemented profile page
-          </li>
-          <li>
-            it's very basic implementation, come back later for updated ui!
-          </li>
+          <li>come back later for updated ui!</li>
         </ul>
       </div>
     </div>
