@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
-              <div className="mt-1 min-h-[20px] text-sm">
+              <div className="mt-1 min-h-5 text-sm">
                 {confirmPassword.length > 0 && passwordsMatch && (
                   <span className="text-green-600">✓ Passwords match</span>
                 )}

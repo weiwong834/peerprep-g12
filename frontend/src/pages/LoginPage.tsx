@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../services/userService";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -7,17 +8,23 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
 
     if (!email || !password) {
       setError("Please enter both email and password.");
       return;
     }
 
-    // Temporary mock login
-    localStorage.setItem("token", "demo-token");
-    navigate("/home");
+    try {
+      await loginUser(email, password);
+      navigate("/home");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Login failed. Please try again.";
+      setError(message);
+    }
   }
 
   return (

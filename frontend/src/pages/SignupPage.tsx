@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { signupUser } from "../services/userService";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export default function SignupPage() {
   async function mockCheckEmailAvailability(inputEmail: string) {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    if (inputEmail.toLowerCase() === "taken@email.com") {
+    if (inputEmail.toLowerCase() === "admin@gmail.com") {
       return { available: false };
     }
 
@@ -58,11 +59,6 @@ export default function SignupPage() {
     }
 
     return { available: true };
-  }
-
-  async function mockSignup() {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    return { success: true };
   }
 
   // ---------------- VALIDATION ----------------
@@ -141,9 +137,11 @@ export default function SignupPage() {
       setVerificationCode("");
       setCodeError("");
       setSubmitError("");
+      setUsernameAvailable(null);
 
       if (!email || !emailFormatValid) {
         setEmailAvailable(null);
+        setEmailChecking(false);
         return;
       }
 
@@ -172,6 +170,7 @@ export default function SignupPage() {
 
       if (!codeVerified || !usernameFormatValid) {
         setUsernameAvailable(null);
+        setUsernameChecking(false);
         return;
       }
 
@@ -204,6 +203,7 @@ export default function SignupPage() {
 
   async function handleVerifyCode() {
     setCodeError("");
+    setSubmitError("");
 
     if (!verificationCode.trim()) {
       setCodeError("Please enter the verification code.");
@@ -219,6 +219,7 @@ export default function SignupPage() {
     }
 
     setCodeVerified(true);
+    setCodeError("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -226,15 +227,18 @@ export default function SignupPage() {
     setSubmitError("");
 
     if (!canSubmit) {
-      setSubmitError("Please complete all required steps before signing up.");
+      setSubmitError("Please complete all required fields correctly");
       return;
     }
 
-    const result = await mockSignup();
+    try {
+      await signupUser(username, email, password);
 
-    if (result.success) {
-      localStorage.setItem("token", "demo-token");
-      navigate("/home");
+      navigate("/login");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Signup failed. Please try again.";
+      setSubmitError(message);
     }
   }
 
@@ -358,15 +362,27 @@ export default function SignupPage() {
             <div className="mt-1 min-h-5 text-sm">
               {!codeVerified && null}
 
-              {codeVerified && usernameError && (
+              {/* show grey requirements when empty */}
+              {codeVerified && !username && (
+                <div className="text-slate-500 space-y-1">
+                  <div>
+                    Only lowercase letters, numbers, '-' and '_' are accepted
+                  </div>
+                  <div>3-20 characters, no spaces</div>
+                </div>
+              )}
+
+              {codeVerified && username && usernameError && (
                 <span className="text-red-500">✗ {usernameError}</span>
               )}
 
               {codeVerified &&
+                username &&
                 usernameFormatValid &&
                 renderStatus(usernameAvailable, usernameChecking)}
 
               {codeVerified &&
+                username &&
                 usernameFormatValid &&
                 usernameAvailable === true && (
                   <span className="ml-2 text-green-600">

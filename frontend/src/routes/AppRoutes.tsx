@@ -15,7 +15,7 @@ import AppLayout from "../components/layout/AppLayout";
  * temporary auth check
  */
 const isAuthenticated = () => {
-  return localStorage.getItem("token") !== null;
+  return localStorage.getItem("accessToken") !== null;
 };
 
 /**
