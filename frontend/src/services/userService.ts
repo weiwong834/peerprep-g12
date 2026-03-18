@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:3001";
+const API_BASE = "http://localhost:3000";
 
 type RequestOptions = RequestInit & {
   headers?: Record<string, string>;
