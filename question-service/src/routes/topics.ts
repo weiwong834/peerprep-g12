@@ -5,6 +5,6 @@ const router = Router();
 
 router.get('/', getAllTopics); 
 router.post('/', createTopic);
-router.delete('/', deleteTopic);
+router.delete('/:name', deleteTopic);
 
 export default router; 

@@ -24,7 +24,10 @@ export async function getAllQuestions(req: Request, res: Response) {
         .in('availability_status', ['available', 'archived']);
 
     if (difficulty) query = query.eq('difficulty', difficulty);
-    if (status && ['available', 'archived'].includes(status as string)) {
+    if (status) {
+        if (!['available', 'archived'].includes(status as string)) {
+        return res.status(400).json({ error: 'Invalid status. Must be available or archived.'})
+        }
         query = query.eq('availability_status', status);
     }
 
@@ -264,7 +267,7 @@ export async function archiveQuestion(req: Request, res: Response) {
         .schema('questionservice')
         .from('questions')
         .select('*')
-        .eq('question_numer', questionNumber)
+        .eq('question_number', questionNumber)
         .eq('availability_status', 'available')
         .single();
 
