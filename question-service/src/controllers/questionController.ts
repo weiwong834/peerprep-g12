@@ -1,3 +1,4 @@
+import { diff } from "node:util";
 import { supabase } from "../supabaseClient";
 import { Request, Response } from 'express';
 
@@ -132,4 +133,117 @@ export async function createQuestion(req: Request, res: Response) {
     if (linkError) return res.status(500).json({ error: linkError.message });
 
     return res.status(201).json(newQuestion);
+}
+
+/**
+ * Edits an existing question using a versioning strategy. 
+ * Marks the current version as superseded and creates a new available version
+ * with the same question number and updated content. 
+ * 
+ * @route PATCH /questions/:questionNumber
+ * @access Admin only
+ * @param {string} questionNumber - The question number to edit 
+ * @body {string} [title] - Updated title
+ * @body {string} [description] - Updated description 
+ * @body {string} [difficulty] - Updated difficulty (easy/medium/hard)
+ * @body {string[]} [topics] Updated array of topic names
+ * @returns {Object} The newly created question version 
+ */
+export async function editQuestion(req: Request, res: Response) {
+    const { questionNumber } = req.params;
+    const { title, description, difficulty, topics } = req.body; 
+
+    //At least one field must be provided (uh, might change this logic later)
+    if (!title && !description && !difficulty && !topics) {
+        return res.status(400).json({ error: 'Please provide at least one field to update.'});
+    }
+
+    //Validate difficulty if provided 
+    if (difficulty && !['easy', 'medium', 'hard'].includes(difficulty)) {
+        return res.status(400).json({ error: 'Difficulty must be: easy, medium or hard'});
+    }
+
+    //Validate topics if provided 
+    if (topics && topics.length > 0) {
+        const { data: existingTopics, error: topicError } = await supabase
+            .schema('questionservice')
+            .from('topics')
+            .select('name')
+            .in('name', topics);
+        
+        if (topicError) return res.status(500).json({ error: topicError.message });
+
+        if (existingTopics.length !== topics.length) {
+            const foundNames = existingTopics.map((t: any) => t.name);
+            const invalid = topics.filter((t: string) => !foundNames.includes(t));
+            return res.status(400).json({ error: `These topics do not exist: ${invalid.join(', ')}` });
+        }
+    }
+
+    //Fetch current available version of question
+    const { data: current, error: fetchError } = await supabase
+        .schema('questionservice')
+        .from('questions')
+        .select(`*, question_topics(topic)`)
+        .eq('question_number', questionNumber)
+        .eq('availability_status', 'available')
+        .single();
+    
+    if (fetchError || !current) {
+        return res.status(404).json({ error: `Error fetching question number ${questionNumber}.`});
+    }
+
+    //Checking if any changes have been made
+    const currentTopics = current.question_topics.map((qt: any) => qt.topic).sort();
+    const incomingTopics = (topics ?? currentTopics).slice().sort();
+
+    const nothingChanged = 
+        (title ?? current.title) === current.title &&
+        (description ?? current.description) === current.description &&
+        (difficulty ?? current.difficulty) === current.difficulty &&
+        JSON.stringify(currentTopics) === JSON.stringify(incomingTopics);
+    
+    if (nothingChanged) {
+        return res.status(200).json({ message: 'No changes detected, question was not modified', question: current });
+    }
+
+    //Mark old version as superseded
+    const { error : supersededError } = await supabase
+        .schema('questionservice')
+        .from('questions')
+        .update({ availability_status: 'superseded' })
+        .eq('id', current.id); 
+    
+    if (supersededError) return res.status(500).json({ error: supersededError.message });
+
+    //Create new version inheriting the same question_number
+    const { data: newVersion, error: insertError } = await supabase
+        .schema('questionservice')
+        .from('questions')
+        .insert({ 
+            question_number: current.question_number,
+            title: title ?? current.title,
+            description: description ?? current.description,
+            difficulty: difficulty ?? current.difficulty,
+            availability_status: 'available'
+        })
+        .select()
+        .single();
+    
+    if (insertError) return res.status(500).json({ error: insertError.message });
+
+    const topicsToLink = topics ?? current.question_topics.map((qt: any) => qt.topic);
+    const topicLinks = topicsToLink.map((topic: string) => ({
+        question_id: newVersion.id,
+        topic
+    }));
+
+    const { error: linkError } = await supabase
+        .schema('questionservice')
+        .from('question_topics')
+        .insert(topicLinks);
+
+    if (linkError) return res.status(500).json({ error: linkError.message });
+
+    return res.status(200).json(newVersion);
 }
