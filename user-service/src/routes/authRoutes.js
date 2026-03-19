@@ -5,6 +5,7 @@ import {
   logout,
   getUserInfo,
   updateUsername,
+  checkUniqueUsername,
   updateUserRole,
   getAllUsers
 } from "../controllers/authController.js";
@@ -21,6 +22,7 @@ router.post("/auth/logout", requireAuth, logout);
 // user profile routes
 router.get("/user/getUserInfo", requireAuth, getUserInfo);
 router.patch("/user/username", requireAuth, updateUsername);
+router.get("/user/checkUniqueUsername", checkUniqueUsername);
 
 // admin routes
 router.patch("/admin/role/:userId", requireAuth, requireAdmin, updateUserRole);

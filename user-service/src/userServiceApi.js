@@ -29,8 +29,11 @@ const authFetch = async (url, options = {}) => {
  * POST /auth/signup
  */
 export const signupUser = async (username, email, password) => {
-  return authFetch(`${API_BASE}/auth/signup`, {
+  return fetch(`${API_BASE}/auth/signup`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ username, email, password }),
   });
 };
@@ -40,10 +43,15 @@ export const signupUser = async (username, email, password) => {
  * POST /auth/login
  */
 export const loginUser = async (email, password) => {
-  const data = await authFetch(`${API_BASE}/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ email, password }),
   });
+
+  const data = await res.json();
 
   // store token automatically
   if (data.accessToken) {
@@ -113,6 +121,18 @@ export const promoteUser = async (userId) => {
  */
 export const getAllUsers = async () => {
   return authFetch(`${API_BASE}/admin/allUsers`, {
+    method: "GET",
+  });
+};
+
+/**
+ * Check if there is a duplicate username in the database.
+ * GET /user/checkUniqueUsername?username=<username>
+ */
+export const checkUniqueUsername = async (username) => {
+  const params = new URLSearchParams({ username });
+
+  return fetch(`${API_BASE}/user/checkUniqueUsername?${params.toString()}`, {
     method: "GET",
   });
 };

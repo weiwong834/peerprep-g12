@@ -525,7 +525,6 @@ export const logout = async (req, res) => {
  *     {
  *       id: string,
  *       username: string,
- *       email: string,
  *       user_role: string
  *     }...
  *   ]
@@ -594,4 +593,61 @@ export const getAllUsers = async (req, res) => {
   }));
 
   res.json(formattedUsers);
+};
+
+
+/**
+ * Checks whether a given username is available.
+ *
+ * Endpoint:
+ *   GET /user/checkUniqueUsername?username=:userId
+ *
+ * Query Parameters:
+ *   username: string
+ *
+ * Returns:
+ *   200 OK
+ *   {
+ *     available: boolean
+ *   }
+ *
+ * Errors:
+ *   400 Bad Request - Username is not provided
+ *   500 Internal Server Error - Failed to query database
+ */
+export const checkUniqueUsername = async (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return res.status(400).json({
+      code: "EMPTY_FIELD",
+      message: "Username is required"
+    });
+  }
+
+  const { data, error } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) {
+    return res.status(500).json({
+      code: "QUERY_FAILED",
+      message: "Error checking username"
+    });
+  }
+
+  // if data exists --> username taken
+  if (data) {
+    return res.status(200).json({
+      available: false
+    });
+  }
+
+  // if no data --> username available
+  return res.status(200).json({
+    available: true
+  });
 };
