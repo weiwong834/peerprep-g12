@@ -17,10 +17,10 @@ export interface Session {
 export interface CreateSessionDTO {
   user1_id: string;
   user2_id: string;
-  question_id: string;
   language: string;
   difficulty: string;
   topic: string;
+  question_id?: string;
 }
 
 export interface UpdateSessionDTO {

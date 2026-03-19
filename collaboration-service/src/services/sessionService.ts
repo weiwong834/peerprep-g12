@@ -2,10 +2,35 @@ import supabase from '../config/supabase';
 import { Session, CreateSessionDTO, UpdateSessionDTO } from '../models/session';
 import { randomUUID } from 'crypto';
 
+const fetchQuestionFromService = async (topic: string, difficulty: string): Promise<string> => {
+  const questionServiceUrl = process.env.QUESTION_SERVICE_URL || 'http://localhost:3002';
+  
+  const response = await fetch(`${questionServiceUrl}/internal/questions/fetch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic, difficulty }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch question from Question Service: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.id) {
+    throw new Error('Question Service returned no question ID');
+  }
+
+  return data.id;
+};
+
 export const createSession = async (dto: CreateSessionDTO): Promise<Session> => {
+  const question_id = await fetchQuestionFromService(dto.topic, dto.difficulty);
+
   const newSession = {
     session_id: randomUUID(),
     ...dto,
+    question_id,
     start_timestamp: new Date(),
     end_timestamp: null,
     status: 'active',
