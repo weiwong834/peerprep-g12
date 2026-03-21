@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signupUser } from "../services/userService";
+import { signupUser, checkUniqueUsername } from "../services/userService";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -10,9 +10,6 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
-  const [emailChecking, setEmailChecking] = useState(false);
 
   const [codeSent, setCodeSent] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
@@ -24,18 +21,10 @@ export default function SignupPage() {
   const [usernameChecking, setUsernameChecking] = useState(false);
 
   const [submitError, setSubmitError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
+  const [usernameSubmitError, setUsernameSubmitError] = useState("");
 
   // ---------------- MOCK API ----------------
-  async function mockCheckEmailAvailability(inputEmail: string) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    if (inputEmail.toLowerCase() === "admin@gmail.com") {
-      return { available: false };
-    }
-
-    return { available: true };
-  }
-
   async function mockSendVerificationCode() {
     await new Promise((resolve) => setTimeout(resolve, 400));
     return { success: true };
@@ -49,16 +38,6 @@ export default function SignupPage() {
     }
 
     return { valid: false };
-  }
-
-  async function mockCheckUsernameAvailability(inputUsername: string) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    if (inputUsername.toLowerCase() === "admin") {
-      return { available: false };
-    }
-
-    return { available: true };
   }
 
   // ---------------- VALIDATION ----------------
@@ -119,91 +98,76 @@ export default function SignupPage() {
 
   const canSubmit =
     emailFormatValid &&
-    emailAvailable === true &&
     codeVerified &&
     usernameFormatValid &&
     usernameAvailable === true &&
     passwordValid &&
     passwordsMatch;
 
-  // ---------------- LIVE EMAIL CHECK ----------------
+  // ---------------- RESET WHEN EMAIL CHANGES ----------------
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkEmail() {
-      // reset dependent fields if email changes
-      setCodeSent(false);
-      setCodeVerified(false);
-      setVerificationCode("");
-      setCodeError("");
-      setSubmitError("");
-      setUsernameAvailable(null);
-
-      if (!email || !emailFormatValid) {
-        setEmailAvailable(null);
-        setEmailChecking(false);
-        return;
-      }
-
-      setEmailChecking(true);
-      const result = await mockCheckEmailAvailability(email);
-
-      if (!cancelled) {
-        setEmailAvailable(result.available);
-        setEmailChecking(false);
-      }
-    }
-
-    checkEmail();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [email, emailFormatValid]);
+    setCodeSent(false);
+    setCodeVerified(false);
+    setVerificationCode("");
+    setCodeError("");
+    setSubmitError("");
+    setEmailSubmitError("");
+    setUsernameSubmitError("");
+    setUsernameAvailable(null);
+  }, [email]);
 
   // ---------------- LIVE USERNAME CHECK ----------------
   useEffect(() => {
     let cancelled = false;
 
-    async function checkUsername() {
-      setSubmitError("");
-
-      if (!codeVerified || !usernameFormatValid) {
-        setUsernameAvailable(null);
-        setUsernameChecking(false);
-        return;
-      }
-
-      setUsernameChecking(true);
-      const result = await mockCheckUsernameAvailability(username);
-
-      if (!cancelled) {
-        setUsernameAvailable(result.available);
-        setUsernameChecking(false);
-      }
+    if (!codeVerified || !usernameFormatValid || !username.trim()) {
+      setUsernameAvailable(null);
+      setUsernameChecking(false);
+      return;
     }
 
-    checkUsername();
+    setUsernameChecking(true);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const result = await checkUniqueUsername(username);
+
+        if (!cancelled) {
+          setUsernameAvailable(result.available);
+        }
+      } catch {
+        if (!cancelled) {
+          setUsernameAvailable(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setUsernameChecking(false);
+        }
+      }
+    }, 500); // wait 500ms after user stops typing
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, [username, codeVerified, usernameFormatValid]);
 
   // ---------------- ACTIONS ----------------
   async function handleGetCode() {
-    if (!(emailFormatValid && emailAvailable)) return;
+    if (!emailFormatValid) return;
 
     const result = await mockSendVerificationCode();
     if (result.success) {
       setCodeSent(true);
       setCodeError("");
+      setEmailSubmitError("");
     }
   }
 
   async function handleVerifyCode() {
     setCodeError("");
     setSubmitError("");
+    setEmailSubmitError("");
 
     if (!verificationCode.trim()) {
       setCodeError("Please enter the verification code.");
@@ -224,7 +188,10 @@ export default function SignupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     setSubmitError("");
+    setEmailSubmitError("");
+    setUsernameSubmitError("");
 
     if (!canSubmit) {
       setSubmitError("Please complete all required fields correctly");
@@ -233,12 +200,15 @@ export default function SignupPage() {
 
     try {
       await signupUser(username, email, password);
-
       navigate("/login");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Signup failed. Please try again.";
-      setSubmitError(message);
+    } catch (err: any) {
+      if (err?.code === "DUPLICATE_EMAIL") {
+        setEmailSubmitError("This email is already registered.");
+      } else if (err?.code === "DUPLICATE_USERNAME") {
+        setUsernameSubmitError("Username already taken.");
+      } else {
+        setSubmitError(err?.message || "Signup failed. Please try again.");
+      }
     }
   }
 
@@ -272,6 +242,7 @@ export default function SignupPage() {
         <h1 className="text-2xl font-bold text-slate-800 text-center">
           Create your PeerPrep account
         </h1>
+
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           {/* Email */}
           <div>
@@ -290,19 +261,17 @@ export default function SignupPage() {
               {email && !emailFormatValid && (
                 <span className="text-red-500">✗ Invalid email format</span>
               )}
-              {emailFormatValid && renderStatus(emailAvailable, emailChecking)}
-              {emailAvailable === true && (
-                <span className="ml-2 text-green-600">Email is available</span>
+              {email && emailFormatValid && (
+                <span className="text-green-600">✓ Valid email format</span>
+              )}
+              {emailSubmitError && (
+                <div className="text-red-500">{emailSubmitError}</div>
               )}
             </div>
           </div>
 
           {/* Verification Code */}
-          <div
-            className={
-              !(emailFormatValid && emailAvailable) ? "opacity-40" : ""
-            }
-          >
+          <div className={!emailFormatValid ? "opacity-40" : ""}>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Verification Code
             </label>
@@ -312,13 +281,13 @@ export default function SignupPage() {
                 placeholder="Enter verification code"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
-                disabled={!(emailFormatValid && emailAvailable)}
+                disabled={!emailFormatValid}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
               <button
                 type="button"
                 onClick={handleGetCode}
-                disabled={!(emailFormatValid && emailAvailable)}
+                disabled={!emailFormatValid}
                 className="whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Get Code
@@ -326,7 +295,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={handleVerifyCode}
-                disabled={!(emailFormatValid && emailAvailable) || !codeSent}
+                disabled={!emailFormatValid || !codeSent}
                 className="whitespace-nowrap rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Verify
@@ -362,13 +331,12 @@ export default function SignupPage() {
             <div className="mt-1 min-h-5 text-sm">
               {!codeVerified && null}
 
-              {/* show grey requirements when empty */}
               {codeVerified && !username && (
                 <div className="text-slate-500 space-y-1">
                   <div>
                     Only lowercase letters, numbers, '-' and '_' are accepted
                   </div>
-                  <div>3-20 characters, no spaces</div>
+                  <div>3–20 characters, no spaces</div>
                 </div>
               )}
 
@@ -389,6 +357,10 @@ export default function SignupPage() {
                     Username is available
                   </span>
                 )}
+
+              {usernameSubmitError && (
+                <div className="text-red-500">{usernameSubmitError}</div>
+              )}
             </div>
           </div>
 

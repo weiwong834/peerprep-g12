@@ -102,6 +102,15 @@ export async function logoutUser() {
   }
 }
 
+export async function checkUniqueUsername(username: string) {
+  return authFetch<{ available: boolean }>(
+    `${API_BASE}/user/checkUniqueUsername?username=${encodeURIComponent(username)}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
 export async function getUserInfo() {
   return authFetch<{
     id: string;
