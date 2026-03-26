@@ -76,27 +76,45 @@ export const initCollabService = (httpServer: HttpServer) => {
 
     // user ends session (F11.5)
     socket.on('end-session', async ({ sessionId, userId }) => {
-      try {
-        await sessionService.endSession(sessionId);
-
-        // clear idle timers
-        clearIdleTimers(sessionId);
-        stopCodeSaveInterval(sessionId);
-
-        // notify partner (F11.5.1)
-        socket.to(sessionId).emit('session-ended', {
-          message: 'Your partner has ended the session.',
-          endedBy: userId,
-        });
-
-        // remove user from room immediately (F11.5.2)
-        socket.leave(sessionId);
-
-        console.log(`Session ${sessionId} ended by ${userId}`);
-      } catch (err) {
-        socket.emit('error', { message: 'Failed to end session' });
+    try {
+      const session = await sessionService.getSessionById(sessionId);
+      if (!session) {
+        socket.emit('error', { message: 'Session not found' });
+        return;
       }
-    });
+
+      await sessionService.endSession(sessionId);
+      clearIdleTimers(sessionId);
+      stopCodeSaveInterval(sessionId);
+
+      // check for early termination (F11.7)
+      const sessionDurationMs = Date.now() - new Date(session.start_timestamp).getTime();
+      const TWO_MINUTES_MS = 2 * 60 * 1000;
+
+      if (sessionDurationMs < TWO_MINUTES_MS) {
+        console.log(`Early termination detected by ${userId} in session ${sessionId}`);
+
+        // notify Matching Service (F11.7.4)
+        await notifyEarlyTermination(userId, sessionId);
+
+        // notify non-terminating user they can rejoin immediately (F11.7.5)
+        socket.to(sessionId).emit('rejoin-available', {
+          message: 'Your partner ended the session early. You can rejoin the queue immediately.',
+        });
+      }
+
+      // notify partner session has ended (F11.5.1)
+      socket.to(sessionId).emit('session-ended', {
+        message: 'Your partner has ended the session.',
+        endedBy: userId,
+      });
+
+      socket.leave(sessionId);
+      console.log(`Session ${sessionId} ended by ${userId}`);
+    } catch (err) {
+      socket.emit('error', { message: 'Failed to end session' });
+    }
+  });
 
     // partner confirmed session end (F11.5.2)
     socket.on('confirm-session-end', ({ sessionId }) => {
@@ -122,6 +140,22 @@ export const initCollabService = (httpServer: HttpServer) => {
   });
 
   return io;
+};
+
+const notifyEarlyTermination = async (terminatingUserId: string, sessionId: string): Promise<void> => {
+  // TODO: confirm endpoint path with Matching Service teammate
+  const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:3002';
+  try {
+    await fetch(`${matchingServiceUrl}/controllers/early-termination`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: terminatingUserId, sessionId }),
+    });
+    console.log(`Notified Matching Service of early termination by ${terminatingUserId}`);
+  } catch (err) {
+    // don't block session end if Matching Service is unreachable
+    console.error('Failed to notify Matching Service of early termination:', err);
+  }
 };
 
 // reset idle timer for a session (F11.6.1)
