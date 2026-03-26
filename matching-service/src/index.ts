@@ -4,6 +4,7 @@ import express, { type Request, type Response } from 'express';
 import { MatchingService } from './services/matchingService.js';
 import { RedisService } from './services/redisService.js';
 import { QuestionService } from './services/questionService.js';
+import { createLogger } from './utils/logger.js';
 import {
   ActionFlowStatus,
   MatchResponseStatus,
@@ -14,10 +15,11 @@ import {
 } from './types/matchingEvents.js';
 
 const app = express();
+const logger = createLogger('index');
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:4000', // assuming frontend runs on port 4000
+    origin: 'http://localhost:5173', // assuming frontend runs on port 5173
     methods: '*'
   }
 });
@@ -37,14 +39,27 @@ app.get('/', (_req: Request, res: Response) => {
   res.send('Matching Service is running');
 });
 
+// Listens for connection event
+// TBD with frontend: Should frontend connect to socket upon entering matching page?
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  logger.info('Socket connected', { socketId: socket.id });
 
+  // Listens for match request event from frontend: Upon user clicking "Find Match" button
+  // which should MatchRequestPayload (defined in matchingEvents.ts)
   socket.on(WebSocketEventType.MATCH_REQUEST, async (payload: MatchRequestPayload) => {
+    logger.info('Received MATCH_REQUEST', {
+      socketId: socket.id,
+      userId: payload.userId,
+      criteria: payload.criteria
+    });
     try {
       await matchingService.handleMatchRequest(socket, payload);
     } catch (error) {
-      console.error('Failed to process MATCH_REQUEST', error);
+      logger.error('Failed to process MATCH_REQUEST', {
+        socketId: socket.id,
+        userId: payload.userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       socket.emit(WebSocketEventType.MATCH_RESPONSE, {
         status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
         flowStatus: ActionFlowStatus.TERMINATED,
@@ -53,11 +68,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Listens for cancel request event from frontend: Upon user clicking "Cancel" button while waiting for match
   socket.on(WebSocketEventType.CANCEL_REQUEST, async (payload: CancelRequestPayload) => {
+    logger.info('Received CANCEL_REQUEST', {
+      socketId: socket.id,
+      userId: payload.userId
+    });
     try {
       await matchingService.handleCancelRequest(socket, payload);
     } catch (error) {
-      console.error('Failed to process CANCEL_REQUEST', error);
+      logger.error('Failed to process CANCEL_REQUEST', {
+        socketId: socket.id,
+        userId: payload.userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       socket.emit(WebSocketEventType.CANCEL_RESPONSE, {
         status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
         flowStatus: ActionFlowStatus.TERMINATED,
@@ -67,10 +91,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on(WebSocketEventType.CONFIRM_REQUEST, async (payload: ConfirmRequestPayload) => {
+    logger.info('Received CONFIRM_REQUEST', {
+      socketId: socket.id,
+      userId: payload.userId,
+      accepted: payload.accepted
+    });
     try {
       await matchingService.handleConfirmRequest(socket, payload);
     } catch (error) {
-      console.error('Failed to process CONFIRM_REQUEST', error);
+      logger.error('Failed to process CONFIRM_REQUEST', {
+        socketId: socket.id,
+        userId: payload.userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       socket.emit(WebSocketEventType.MATCH_RESPONSE, {
         status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
         flowStatus: ActionFlowStatus.TERMINATED,
@@ -80,12 +113,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected');
+    logger.info('Socket disconnected', { socketId: socket.id });
     matchingService.handleSocketDisconnect(socket.id);
   });
 });
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
   await redisService.connect();
-  console.log(`Matching Service listening on http://localhost:${PORT}`);
+  logger.info('Matching service listening', {
+    port: PORT,
+    collaborationServiceBaseUrl,
+    questionServiceBaseUrl
+  });
 });

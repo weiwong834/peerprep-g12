@@ -48,10 +48,8 @@ export enum DifficultyLevel {
 export enum ProgrammingLanguage {
   JAVASCRIPT = 'javascript',
   PYTHON = 'python',
-  JAVA = 'java',
-  CPP = 'cpp'
+  JAVA = 'java'
 }
-
 export interface MatchCriteria {
   topic: Topic;
   difficulty: DifficultyLevel;
