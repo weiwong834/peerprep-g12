@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { connectRedis } from './config/redis';
 import sessionRoutes from './routes/sessionRoutes';
-import { initCollabService } from './services/collabService';
+import { initCollabService, startRetryJob } from './services/collabService';
 
 dotenv.config();
 
@@ -22,13 +22,14 @@ app.get('/health', (req, res) => {
 
 // routes
 app.use('/sessions', sessionRoutes);
-initCollabService(httpServer);
 
 const PORT = process.env.PORT || 3003;
 
 const start = async () => {
   try {
     await connectRedis();
+    initCollabService(httpServer);
+    startRetryJob();
     httpServer.listen(PORT, () => {
       console.log(`Collaboration service running on port ${PORT}`);
     });

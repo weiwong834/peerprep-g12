@@ -1,0 +1,23 @@
+import { io } from 'socket.io-client';
+
+const SESSION_ID = '291154f0-083d-44d6-9bd8-23961ebff2c8';
+const USER1_ID = 'a9261639-ad11-45d9-8ac1-5f3873f83acf';
+
+const socket1 = io('http://localhost:3003');
+
+socket1.on('connect', () => {
+  console.log('Connected');
+  socket1.emit('join-session', { sessionId: SESSION_ID, userId: USER1_ID });
+});
+
+socket1.on('code-restored', (data) => {
+  console.log('Code restored:', data);
+  // should say "latest redis version"
+  socket1.disconnect();
+  process.exit(0);
+});
+
+setTimeout(() => {
+  console.log('No code restored event received');
+  process.exit(0);
+}, 5000);

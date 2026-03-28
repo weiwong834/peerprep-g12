@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import redisClient from '../config/redis';
+import supabase from '../config/supabase';
 import * as sessionService from './sessionService';
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins (F11.6)
@@ -47,6 +48,11 @@ export const initCollabService = (httpServer: HttpServer) => {
         const savedCode = await redisClient.get(`session:${sessionId}:code`);
         if (savedCode) {
           socket.emit('code-restored', { code: savedCode });
+        } else if (session.code_content) {
+          // fallback to last Supabase save (F11.2.3)
+          socket.emit('code-restored', { code: session.code_content });
+          // re-populate Redis with Supabase value
+          await redisClient.set(`session:${sessionId}:code`, session.code_content);
         }
 
         // notify partner that user has joined
@@ -76,27 +82,46 @@ export const initCollabService = (httpServer: HttpServer) => {
 
     // user ends session (F11.5)
     socket.on('end-session', async ({ sessionId, userId }) => {
-      try {
-        await sessionService.endSession(sessionId);
-
-        // clear idle timers
-        clearIdleTimers(sessionId);
-        stopCodeSaveInterval(sessionId);
-
-        // notify partner (F11.5.1)
-        socket.to(sessionId).emit('session-ended', {
-          message: 'Your partner has ended the session.',
-          endedBy: userId,
-        });
-
-        // remove user from room immediately (F11.5.2)
-        socket.leave(sessionId);
-
-        console.log(`Session ${sessionId} ended by ${userId}`);
-      } catch (err) {
-        socket.emit('error', { message: 'Failed to end session' });
+    try {
+      const session = await sessionService.getSessionById(sessionId);
+      if (!session) {
+        socket.emit('error', { message: 'Session not found' });
+        return;
       }
-    });
+
+      await sessionService.endSession(sessionId);
+      clearIdleTimers(sessionId);
+      stopCodeSaveInterval(sessionId);
+
+      // check for early termination (F11.7)
+      const sessionDurationMs = Date.now() - new Date(session.start_timestamp).getTime();
+      const TWO_MINUTES_MS = 2 * 60 * 1000;
+
+      if (sessionDurationMs < TWO_MINUTES_MS) {
+        console.log(`Early termination detected by ${userId} in session ${sessionId}`);
+
+        // notify Matching Service (F11.7.4)
+        const terminatedAt = new Date();
+        await notifyEarlyTermination(userId, sessionId, terminatedAt);
+
+        // notify non-terminating user they can rejoin immediately (F11.7.5)
+        socket.to(sessionId).emit('rejoin-available', {
+          message: 'Your partner ended the session early. You can rejoin the queue immediately.',
+        });
+      }
+
+      // notify partner session has ended (F11.5.1)
+      socket.to(sessionId).emit('session-ended', {
+        message: 'Your partner has ended the session.',
+        endedBy: userId,
+      });
+
+      socket.leave(sessionId);
+      console.log(`Session ${sessionId} ended by ${userId}`);
+    } catch (err) {
+      socket.emit('error', { message: 'Failed to end session' });
+    }
+  });
 
     // partner confirmed session end (F11.5.2)
     socket.on('confirm-session-end', ({ sessionId }) => {
@@ -122,6 +147,44 @@ export const initCollabService = (httpServer: HttpServer) => {
   });
 
   return io;
+};
+
+const notifyEarlyTermination = async (
+  terminatingUserId: string,
+  sessionId: string,
+  terminatedAt: Date
+): Promise<void> => {
+  const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:3002';
+  const payload = {
+    userId: terminatingUserId,
+    sessionId,
+    terminatedAt: terminatedAt.toISOString(),
+  };
+
+  try {
+    const response = await fetch(`${matchingServiceUrl}/internal/early-termination`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error(`Matching Service responded with ${response.status}`);
+    console.log(`Notified Matching Service of early termination by ${terminatingUserId}`);
+  } catch (err) {
+    console.error('Failed to notify Matching Service, storing for retry:', err);
+
+    // store failed notification for retry
+    const { error } = await supabase
+      .schema('collaborationservice')
+      .from('failed_notifications')
+      .insert({
+        user_id: terminatingUserId,
+        session_id: sessionId,
+        terminated_at: terminatedAt.toISOString(),
+      });
+
+    if (error) console.error('Failed to store failed notification:', error.message);
+  }
 };
 
 // reset idle timer for a session (F11.6.1)
@@ -187,4 +250,62 @@ const startCodeSaveInterval = (sessionId: string) => {
 const stopCodeSaveInterval = (sessionId: string) => {
     const interval = codeSaveTimers.get(sessionId);
     if (interval) { clearInterval(interval); codeSaveTimers.delete(sessionId); }
+};
+
+export const startRetryJob = () => {
+  setInterval(async () => {
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+      // delete entries older than 1 hour (outside rolling window, no longer relevant)
+      await supabase
+        .schema('collaborationservice')
+        .from('failed_notifications')
+        .delete()
+        .lt('terminated_at', oneHourAgo);
+
+      // fetch remaining failed notifications
+      const { data: pending, error } = await supabase
+        .schema('collaborationservice')
+        .from('failed_notifications')
+        .select('*');
+
+      if (error || !pending || pending.length === 0) return;
+
+      console.log(`Retrying ${pending.length} failed notification(s)...`);
+
+      for (const notification of pending) {
+        const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:3002';
+
+        try {
+          const response = await fetch(`${matchingServiceUrl}/internal/early-termination`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: notification.user_id,
+              sessionId: notification.session_id,
+              terminatedAt: notification.terminated_at,
+            }),
+          });
+
+          if (response.ok) {
+            // remove from failed_notifications on success
+            await supabase
+              .schema('collaborationservice')
+              .from('failed_notifications')
+              .delete()
+              .eq('id', notification.id);
+
+            console.log(`Retry successful for user ${notification.user_id}`);
+          }
+        } catch (err) {
+          console.error(`Retry failed for user ${notification.user_id}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error('Retry job error:', err);
+    }
+  }, 2 * 60 * 1000); // every 2 minutes
+
+  console.log('Failed notification retry job started');
 };
