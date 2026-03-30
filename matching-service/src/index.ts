@@ -120,6 +120,7 @@ io.on('connection', (socket) => {
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
   await redisService.connect();
+  await questionService.connect();
   logger.info('Matching service listening', {
     port: PORT,
     collaborationServiceBaseUrl,

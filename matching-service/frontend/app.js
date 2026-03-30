@@ -1,3 +1,4 @@
+// Hardcoded for testing purposes
 const TOPICS = [
   'Arrays',
   'Sorting',
