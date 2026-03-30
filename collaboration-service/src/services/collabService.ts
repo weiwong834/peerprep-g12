@@ -33,6 +33,11 @@ export const initCollabService = (httpServer: HttpServer) => {
           return;
         }
 
+        if (session.status !== 'active') {
+          socket.emit('error', { message: 'Session is no longer active' });
+          return;
+        }
+
         // verify user is a participant
         if (session.user1_id !== userId && session.user2_id !== userId) {
           socket.emit('error', { message: 'Unauthorised access to session' });
@@ -103,8 +108,20 @@ export const initCollabService = (httpServer: HttpServer) => {
         socket.emit('error', { message: 'Session not found' });
         return;
       }
+      // check session is still active before ending
+      if (session.status !== 'active') {
+        socket.emit('error', { message: 'Session is already inactive' });
+        return;
+      }
 
       await sessionService.endSession(sessionId);
+
+      // final code save to Supabase on session end
+      const finalCode = await redisClient.get(`session:${sessionId}:code`);
+      if (finalCode) {
+        await sessionService.updateSession(sessionId, { code_content: finalCode });
+      }
+
       clearIdleTimers(sessionId);
       stopCodeSaveInterval(sessionId);
 
@@ -249,9 +266,8 @@ const clearIdleTimers = (sessionId: string) => {
 const startCodeSaveInterval = (sessionId: string) => {
 
   console.log(`Starting code save interval for session ${sessionId}`);
-  // clear existing interval if any
-  const existing = codeSaveTimers.get(sessionId);
-  if (existing) clearInterval(existing);
+  // maintain existing interval if any
+  if (codeSaveTimers.has(sessionId)) return;
 
   const interval = setInterval(async () => {
   try {
@@ -328,5 +344,5 @@ export const startRetryJob = () => {
     }
   }, 2 * 60 * 1000); // every 2 minutes
 
-  console.log('Failed notification retry job started');
+  console.log('Any pending notifications will be sent every 2 mins');
 };
