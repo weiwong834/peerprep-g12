@@ -146,3 +146,35 @@ export const deleteOwnAccount = async () => {
     method: "DELETE",
   });
 };
+
+/**
+ * Request a password reset email.
+ * POST /auth/requestResetPassword
+ */
+export const requestPasswordReset = async (email) => {
+  return fetch(`${API_BASE}/auth/requestResetPassword`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+};
+
+/**
+ * Reset user password using recovery tokens.
+ * POST /auth/resetPassword
+ */
+export const resetPassword = async (password, accessToken, refreshToken) => {
+  return fetch(`${API_BASE}/auth/resetPassword`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      password,
+      refreshToken,
+    }),
+  });
+};

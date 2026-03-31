@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { supabase, supabaseAdmin } from "../services/supabaseClient.js";
 
 /**
@@ -673,4 +674,129 @@ export const checkUniqueUsername = async (req, res) => {
     code: "SUCCESS",
     message: "Account deleted successfully"
   });
+};
+
+
+/**
+ * Sends request to Supabase Auth to trigger password reset email.
+ *
+ * Endpoint:
+ *   POST /auth/requestResetPassword
+ * 
+ * Body:
+ *   {
+ *     email: string
+ *   }
+ *
+ * Returns:
+ *   200 OK
+ *   {
+ *     code: "SUCCESS",
+ *     message: "Password reset email sent"
+ *   }
+ *
+ * Errors:
+ *   500 Internal Server Error - Failed to send reset email
+ */
+export const requestPasswordReset = async (req, res) => {
+  const { email } = req.body;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "http://localhost:3000/reset-password"
+  });
+
+  if (error) {
+    return res.status(500).json({
+      code: "RESET_FAILED",
+      message: "Failed to send reset email"
+    });
+  }
+
+  res.json({
+    code: "SUCCESS",
+    message: "Password reset email sent"
+  });
+};
+
+
+/**
+ * Resets the user's password using Supabase recovery tokens.
+ *
+ * Endpoint:
+ *   POST /auth/resetPassword
+ * 
+ * Headers:
+ *   Authorization: Bearer <access_token>
+ *
+ * Body:
+ *   {
+ *     password: string,
+ *     refreshToken: string
+ *   }
+ *
+ * Returns:
+ *   200 OK
+ *   {
+ *     code: "SUCCESS"
+ *   }
+ *
+ * Errors:
+ *   400 Bad Request - Missing access token
+ *   401 Unauthorized - Missing or invalid token
+ *   500 Internal Server Error - Failed to reset password
+ * 
+ */
+export const resetPassword = async (req, res) => {
+  try {
+    const { password, refreshToken } = req.body;
+
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        code: "UNAUTHORIZED",
+        message: "Missing token"
+      });
+    }
+
+    const userClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    const { error: sessionError } = await userClient.auth.setSession({
+      access_token: token,
+      refresh_token: refreshToken
+    });
+
+    if (sessionError) {
+      console.error("Session error:", sessionError);
+      return res.status(400).json({
+        code: "INVALID_TOKEN",
+        message: sessionError.message
+      });
+    }
+
+    const { error } = await userClient.auth.updateUser({
+      password: password
+    });
+
+    if (error) {
+      console.error("Update error:", error);
+      return res.status(500).json({
+        code: "UPDATE_FAILED",
+        message: error.message
+      });
+    }
+
+    return res.json({
+      code: "SUCCESS"
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      code: "SERVER_ERROR"
+    });
+  }
 };
