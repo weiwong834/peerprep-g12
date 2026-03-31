@@ -38,49 +38,49 @@ import { supabase, supabaseAdmin } from "../services/supabaseClient.js";
  * @param {Response} res - Express response object used to return the registration result.
  */
 export const signup = async (req, res) => {
-    const { username, email, password } = req.body;
+  const { username, email, password } = req.body;
 
-    // check for duplicate username
-    const { data: existing } = await supabase
-      .schema("userservice")
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .maybeSingle();
-  
-    if (existing) {
-      return res.status(400).json({
-        code: "DUPLICATE_USERNAME",
-        message: "Username already taken."
-      });
-    }
-    
-    // attempt to add user to database
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: "http://localhost:3000/verified",
-        data: {
-          username: username
-        }
-      }
+  // check for duplicate username
+  const { data: existing } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (existing) {
+    return res.status(400).json({
+      code: "DUPLICATE_USERNAME",
+      message: "Username already taken.",
     });
-  
-    // error for duplicate username or email
-    if (error) {
-      return res.status(400).json({
-        code: "DUPLICATE_EMAIL",
-        message: "Duplicate email detected."
-      });
-    }
-  
-    res.status(201).json({
-        code: "SUCCESS",
-        message: "User registered successfully",
-        user: data.user
+  }
+
+  // attempt to add user to database
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: "http://localhost:5173/verified",
+      data: {
+        username: username,
+      },
+    },
+  });
+
+  // error for duplicate username or email
+  if (error) {
+    return res.status(400).json({
+      code: "DUPLICATE_EMAIL",
+      message: "Duplicate email detected.",
     });
-  };
+  }
+
+  res.status(201).json({
+    code: "SUCCESS",
+    message: "User registered successfully",
+    user: data.user,
+  });
+};
 
 /**
  * Authenticates a user using email and password.
@@ -125,16 +125,16 @@ export const login = async (req, res) => {
   });
 
   if (error) {
-    return res.status(401).json({ 
-        code: "INVALID_CREDENTIALS",
-        message: "Invalid email or password." });
+    return res.status(401).json({
+      code: "INVALID_CREDENTIALS",
+      message: "Invalid email or password.",
+    });
   }
 
   res.json({
     accessToken: data.session.access_token,
   });
 };
-
 
 /**
  * Logs out the currently authenticated user.
@@ -167,33 +167,32 @@ export const login = async (req, res) => {
  * @param {Response} res - Express response object used to return the logout result.
  */
 export const logout = async (req, res) => {
-    const supabase = req.supabase;
+  const supabase = req.supabase;
 
-    const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
 
-    if (error) {
-      return res.status(400).json({
-        code: "LOGOUT_FAILED",
-        message: "Logout failed"
-      });
-    }
-
-    return res.status(200).json({
-      code: "SUCCESS",
-      message: "Logged out successfully"
+  if (error) {
+    return res.status(400).json({
+      code: "LOGOUT_FAILED",
+      message: "Logout failed",
     });
-  };
+  }
 
-  
-  /**
- * Gets only the current user's profile information based on 
+  return res.status(200).json({
+    code: "SUCCESS",
+    message: "Logged out successfully",
+  });
+};
+
+/**
+ * Gets only the current user's profile information based on
  * the provided JWT access token.
  *
  * This endpoint verifies the JWT access token provided in the
  * Authorization header and retrieves the corresponding user's
  * profile information from the userservice.profiles table.
  *
- * This function is intended to be called by other services to 
+ * This function is intended to be called by other services to
  * validate the identity and user role of the requesting user.
  *
  * Endpoint:
@@ -218,41 +217,40 @@ export const logout = async (req, res) => {
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
  */
-  export const getUserInfo = async (req, res) => {
-    const supabase = req.supabase;
-    const userId = req.userId;
+export const getUserInfo = async (req, res) => {
+  const supabase = req.supabase;
+  const userId = req.userId;
 
-    const { data: profile, error } = await supabase
-      .schema("userservice")
-      .from("profiles")
-      .select("id, username, user_role")
-      .eq("id", userId)
-      .single();
+  const { data: profile, error } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .select("id, username, user_role")
+    .eq("id", userId)
+    .single();
 
-    if (error) {
-      return res.status(500).json({
-        code: "PROFILE_NOT_FOUND",
-        message: "Error retrieving profile"
-      });
-    }
-
-    if (!profile) {
-      return res.status(404).json({
-        code: "PROFILE_NOT_FOUND",
-        message: "Profile not found"
-      });
-    }
-
-    res.json({
-      id: userId,
-      username: profile.username,
-      email: req.userEmail,
-      isAdmin: profile.user_role === "admin"
+  if (error) {
+    return res.status(500).json({
+      code: "PROFILE_NOT_FOUND",
+      message: "Error retrieving profile",
     });
-  };
+  }
 
+  if (!profile) {
+    return res.status(404).json({
+      code: "PROFILE_NOT_FOUND",
+      message: "Profile not found",
+    });
+  }
 
-  /**
+  res.json({
+    id: userId,
+    username: profile.username,
+    email: req.userEmail,
+    isAdmin: profile.user_role === "admin",
+  });
+};
+
+/**
  * Updates the username of the currently authenticated user.
  *
  * This endpoint allows a logged-in user to change their username.
@@ -297,54 +295,53 @@ export const logout = async (req, res) => {
  * @param {Response} res - Express response object used to return the update result.
  */
 export const updateUsername = async (req, res) => {
-    const supabase = req.supabase;
-    const { username } = req.body;
+  const supabase = req.supabase;
+  const { username } = req.body;
 
-    if (!username) {
-      return res.status(400).json({
-        code: "EMPTY_FIELD",
-        message: "Username is required"
-      });
-    }
-
-    const userId = req.userId;
-
-    const { data: existing } = await supabase
-      .schema("userservice")
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .maybeSingle();
-
-    if (existing) {
-      return res.status(400).json({
-        code: "DUPLICATE_FIELD",
-        message: "Username already taken"
-      });
-    }
-
-    const { data, error } = await supabase
-      .schema("userservice")
-      .from("profiles")
-      .update({ username })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(500).json({
-        code: "UPDATE_FAILED",
-        message: "Failed to update username"
-      });
-    }
-
-    res.json({
-      code: "SUCCESS",
-      message: "Username updated successfully",
-      username: data.username
+  if (!username) {
+    return res.status(400).json({
+      code: "EMPTY_FIELD",
+      message: "Username is required",
     });
-  };
+  }
 
+  const userId = req.userId;
+
+  const { data: existing } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (existing) {
+    return res.status(400).json({
+      code: "DUPLICATE_FIELD",
+      message: "Username already taken",
+    });
+  }
+
+  const { data, error } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .update({ username })
+    .eq("id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({
+      code: "UPDATE_FAILED",
+      message: "Failed to update username",
+    });
+  }
+
+  res.json({
+    code: "SUCCESS",
+    message: "Username updated successfully",
+    username: data.username,
+  });
+};
 
 /**
  * Promotes a user to the Administrator role.
@@ -388,70 +385,69 @@ export const updateUsername = async (req, res) => {
  * @param {Response} res - Express response object used to return the role update result.
  */
 export const updateUserRole = async (req, res) => {
-    const { userId } = req.params;
-    const requesterId = req.userId;
+  const { userId } = req.params;
+  const requesterId = req.userId;
 
-    const { data: requesterProfile, error: requesterError } = await supabaseAdmin
-      .schema("userservice")
-      .from("profiles")
-      .select("user_role")
-      .eq("id", requesterId)
-      .single();
+  const { data: requesterProfile, error: requesterError } = await supabaseAdmin
+    .schema("userservice")
+    .from("profiles")
+    .select("user_role")
+    .eq("id", requesterId)
+    .single();
 
-    if (requesterError || !requesterProfile) {
-      return res.status(500).json({
-        code: "USER_NOT_FOUND",
-        message: "Failed to verify admin"
-      });
-    }
-
-    if (requesterProfile.user_role !== "admin") {
-      return res.status(403).json({
-        code: "UNAUTHORIZED",
-        message: "Only administrators can change user roles"
-      });
-    }
-
-    const { data: targetProfile, error: targetError } = await supabaseAdmin
-      .schema("userservice")
-      .from("profiles")
-      .select("user_role")
-      .eq("id", userId)
-      .single();
-
-    if (targetError || !targetProfile) {
-      return res.status(404).json({
-        code: "USER_NOT_FOUND",
-        message: "User not found"
-      });
-    }
-
-    if (targetProfile.user_role === "admin") {
-      return res.status(400).json({
-        code: "UPDATE_FAILED",
-        message: "User is already an Administrator"
-      });
-    }
-
-    const { error } = await supabaseAdmin
-      .schema("userservice")
-      .from("profiles")
-      .update({ user_role: "admin" })
-      .eq("id", userId);
-
-    if (error) {
-      return res.status(500).json({
-        code: "UPDATE_FAILED",
-        message: "Failed to update user role"
-      });
-    }
-
-    res.json({
-      code: "SUCCESS",
-      message: "User promoted to Administrator"
+  if (requesterError || !requesterProfile) {
+    return res.status(500).json({
+      code: "USER_NOT_FOUND",
+      message: "Failed to verify admin",
     });
-  };
+  }
 
+  if (requesterProfile.user_role !== "admin") {
+    return res.status(403).json({
+      code: "UNAUTHORIZED",
+      message: "Only administrators can change user roles",
+    });
+  }
+
+  const { data: targetProfile, error: targetError } = await supabaseAdmin
+    .schema("userservice")
+    .from("profiles")
+    .select("user_role")
+    .eq("id", userId)
+    .single();
+
+  if (targetError || !targetProfile) {
+    return res.status(404).json({
+      code: "USER_NOT_FOUND",
+      message: "User not found",
+    });
+  }
+
+  if (targetProfile.user_role === "admin") {
+    return res.status(400).json({
+      code: "UPDATE_FAILED",
+      message: "User is already an Administrator",
+    });
+  }
+
+  const { error } = await supabaseAdmin
+    .schema("userservice")
+    .from("profiles")
+    .update({ user_role: "admin" })
+    .eq("id", userId);
+
+  if (error) {
+    return res.status(500).json({
+      code: "UPDATE_FAILED",
+      message: "Failed to update user role",
+    });
+  }
+
+  res.json({
+    code: "SUCCESS",
+    message: "User promoted to Administrator",
+  });
+};
 
 /**
  * Retrieve ALL users info (admin only).
@@ -490,14 +486,14 @@ export const getAllUsers = async (req, res) => {
   if (requesterError || !requesterProfile) {
     return res.status(500).json({
       code: "USER_NOT_FOUND",
-      message: "Failed to verify admin"
+      message: "Failed to verify admin",
     });
   }
 
   if (requesterProfile.user_role !== "admin") {
     return res.status(403).json({
       code: "UNAUTHORIZED",
-      message: "Admin privileges required"
+      message: "Admin privileges required",
     });
   }
 
@@ -510,20 +506,19 @@ export const getAllUsers = async (req, res) => {
   if (error) {
     return res.status(500).json({
       code: "FETCH_FAILED",
-      message: "Failed to retrieve users"
+      message: "Failed to retrieve users",
     });
   }
 
   // convert user_role to boolean isAdmin
-  const formattedUsers = users.map(user => ({
+  const formattedUsers = users.map((user) => ({
     id: user.id,
     username: user.username,
-    isAdmin: user.user_role === "admin"
+    isAdmin: user.user_role === "admin",
   }));
 
   res.json(formattedUsers);
 };
-
 
 /**
  * Checks whether a given username is available.
@@ -545,39 +540,39 @@ export const getAllUsers = async (req, res) => {
  *   500 Internal Server Error - Failed to query database
  */
 export const checkUniqueUsername = async (req, res) => {
-    const { username } = req.query;
+  const { username } = req.query;
 
-    if (!username) {
-      return res.status(400).json({
-        code: "EMPTY_FIELD",
-        message: "Username is required"
-      });
-    }
-
-    const { data, error } = await supabase
-      .schema("userservice")
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .maybeSingle();
-
-    if (error) {
-      return res.status(500).json({
-        code: "QUERY_FAILED",
-        message: "Error checking username"
-      });
-    }
-
-    if (data) {
-      return res.status(200).json({
-        available: false
-      });
-    }
-
-    return res.status(200).json({
-      available: true
+  if (!username) {
+    return res.status(400).json({
+      code: "EMPTY_FIELD",
+      message: "Username is required",
     });
-  };
+  }
+
+  const { data, error } = await supabase
+    .schema("userservice")
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) {
+    return res.status(500).json({
+      code: "QUERY_FAILED",
+      message: "Error checking username",
+    });
+  }
+
+  if (data) {
+    return res.status(200).json({
+      available: false,
+    });
+  }
+
+  return res.status(200).json({
+    available: true,
+  });
+};
 
 /**
  * Deletes the currently authenticated user's account.
@@ -603,7 +598,7 @@ export const checkUniqueUsername = async (req, res) => {
  *   400 Bad Request - Cannot delete the last remaining admin
  *   500 Internal Server Error - Failed to delete user profile or auth user
  */
-  export const deleteOwnAccount = async (req, res) => {
+export const deleteOwnAccount = async (req, res) => {
   const db = supabaseAdmin;
   const userId = req.userId;
 
@@ -618,7 +613,7 @@ export const checkUniqueUsername = async (req, res) => {
   if (userError || !userProfile) {
     return res.status(500).json({
       code: "PROFILE_FETCH_FAILED",
-      message: "Failed to retrieve user profile"
+      message: "Failed to retrieve user profile",
     });
   }
 
@@ -633,14 +628,14 @@ export const checkUniqueUsername = async (req, res) => {
     if (countError) {
       return res.status(500).json({
         code: "COUNT_FAILED",
-        message: "Failed to check admin count"
+        message: "Failed to check admin count",
       });
     }
 
     if (count <= 1) {
       return res.status(400).json({
         code: "LAST_ADMIN",
-        message: "Cannot delete the last remaining admin"
+        message: "Cannot delete the last remaining admin",
       });
     }
   }
@@ -651,11 +646,11 @@ export const checkUniqueUsername = async (req, res) => {
     .from("profiles")
     .delete()
     .eq("id", userId);
-    
+
   if (deleteProfileError) {
     return res.status(500).json({
       code: "DELETE_FAILED",
-      message: "Failed to delete user profile"
+      message: "Failed to delete user profile",
     });
   }
 
@@ -665,12 +660,12 @@ export const checkUniqueUsername = async (req, res) => {
   if (deleteAuthError) {
     return res.status(500).json({
       code: "DELETE_FAILED",
-      message: "Failed to delete auth user"
+      message: "Failed to delete auth user",
     });
   }
 
   res.json({
     code: "SUCCESS",
-    message: "Account deleted successfully"
+    message: "Account deleted successfully",
   });
 };

@@ -23,10 +23,12 @@ export default function LoginPage() {
       const user = await getUserInfo();
       localStorage.setItem("isAdmin", String(user.isAdmin));
       navigate("/home");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Login failed. Please try again.";
-      setError(message);
+    } catch (err: any) {
+      if (err?.code === "INVALID_CREDENTIALS") {
+        setError("Invalid email or password.");
+      } else {
+        setError(err?.message || "Login failed. Please try again.");
+      }
     }
   }
 

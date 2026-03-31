@@ -9,7 +9,7 @@ async function authFetch<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const token = localStorage.getItem("accessToken");
-  console.log(`🚀 Making ${options.method || "GET"} request to:`, url);
+  console.log(`Making ${options.method || "GET"} request to:`, url);
   console.log(
     "Token being sent:",
     token ? `${token.substring(0, 20)}...` : "No token",
@@ -48,7 +48,7 @@ async function authFetch<T>(
     if (!response.ok) {
       console.error("Request failed with status:", response.status);
       console.error("Error data:", data);
-      throw new Error(data.message || data.error || "Request failed");
+      throw data || { message: "Request failed" };
     }
 
     return data;
@@ -151,5 +151,14 @@ export async function getAllUsers() {
     }[]
   >(`${API_BASE}/admin/allUsers`, {
     method: "GET",
+  });
+}
+
+export async function deleteOwnAccount() {
+  return authFetch<{
+    code: string;
+    mesage: string;
+  }>(`${API_BASE}/user/deleteAccount`, {
+    method: "DELETE",
   });
 }

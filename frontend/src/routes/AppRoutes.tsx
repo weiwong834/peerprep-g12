@@ -9,6 +9,7 @@ import HomePage from "../pages/HomePage";
 import ProfilePage from "../pages/ProfilePage";
 import CollaborationPage from "../pages/CollabPage";
 import AdminPage from "../pages/AdminPage";
+import VerifiedPage from "../pages/VerifiedPage";
 
 import AppLayout from "../components/layout/AppLayout";
 
@@ -58,6 +59,7 @@ export default function AppRoutes() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verified" element={<VerifiedPage />} />
 
         {/* Protected layout */}
         <Route

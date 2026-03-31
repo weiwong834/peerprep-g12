@@ -1,19 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { signupUser, checkUniqueUsername } from "../services/userService";
 
 export default function SignupPage() {
-  const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [codeSent, setCodeSent] = useState(false);
-  const [codeVerified, setCodeVerified] = useState(false);
-  const [codeError, setCodeError] = useState("");
 
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null,
@@ -23,22 +16,7 @@ export default function SignupPage() {
   const [submitError, setSubmitError] = useState("");
   const [emailSubmitError, setEmailSubmitError] = useState("");
   const [usernameSubmitError, setUsernameSubmitError] = useState("");
-
-  // ---------------- MOCK API ----------------
-  async function mockSendVerificationCode() {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return { success: true };
-  }
-
-  async function mockVerifyCode(inputCode: string) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    if (inputCode === "123456") {
-      return { valid: true };
-    }
-
-    return { valid: false };
-  }
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   // ---------------- VALIDATION ----------------
   const emailFormatValid = useMemo(() => {
@@ -48,23 +26,18 @@ export default function SignupPage() {
 
   function getUsernameError(name: string): string | null {
     if (!name) return "Please enter a username.";
-
     if (name.length < 3) {
       return "Username must be at least 3 characters.";
     }
-
     if (name.length > 20) {
       return "Username must be at most 20 characters.";
     }
-
     if (/\s/.test(name)) {
       return "Username cannot contain spaces.";
     }
-
     if (name !== name.toLowerCase()) {
       return "Only lowercase letters allowed.";
     }
-
     if (!/^[a-z0-9_-]+$/.test(name)) {
       return "Only letters, numbers, '-' and '_' allowed.";
     }
@@ -98,18 +71,12 @@ export default function SignupPage() {
 
   const canSubmit =
     emailFormatValid &&
-    codeVerified &&
     usernameFormatValid &&
     usernameAvailable === true &&
     passwordValid &&
     passwordsMatch;
 
-  // ---------------- RESET WHEN EMAIL CHANGES ----------------
   useEffect(() => {
-    setCodeSent(false);
-    setCodeVerified(false);
-    setVerificationCode("");
-    setCodeError("");
     setSubmitError("");
     setEmailSubmitError("");
     setUsernameSubmitError("");
@@ -120,7 +87,7 @@ export default function SignupPage() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!codeVerified || !usernameFormatValid || !username.trim()) {
+    if (!usernameFormatValid || !username.trim()) {
       setUsernameAvailable(null);
       setUsernameChecking(false);
       return;
@@ -144,48 +111,15 @@ export default function SignupPage() {
           setUsernameChecking(false);
         }
       }
-    }, 500); // wait 500ms after user stops typing
+    }, 500);
 
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [username, codeVerified, usernameFormatValid]);
+  }, [username, usernameFormatValid]);
 
   // ---------------- ACTIONS ----------------
-  async function handleGetCode() {
-    if (!emailFormatValid) return;
-
-    const result = await mockSendVerificationCode();
-    if (result.success) {
-      setCodeSent(true);
-      setCodeError("");
-      setEmailSubmitError("");
-    }
-  }
-
-  async function handleVerifyCode() {
-    setCodeError("");
-    setSubmitError("");
-    setEmailSubmitError("");
-
-    if (!verificationCode.trim()) {
-      setCodeError("Please enter the verification code.");
-      return;
-    }
-
-    const result = await mockVerifyCode(verificationCode);
-
-    if (!result.valid) {
-      setCodeVerified(false);
-      setCodeError("Verification code is incorrect.");
-      return;
-    }
-
-    setCodeVerified(true);
-    setCodeError("");
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -200,7 +134,7 @@ export default function SignupPage() {
 
     try {
       await signupUser(username, email, password);
-      navigate("/login");
+      setSignupSuccess(true);
     } catch (err: any) {
       if (err?.code === "DUPLICATE_EMAIL") {
         setEmailSubmitError("This email is already registered.");
@@ -233,6 +167,40 @@ export default function SignupPage() {
       <li className={met ? "text-green-600" : "text-slate-500"}>
         {met ? "✓" : "•"} {label}
       </li>
+    );
+  }
+
+  if (signupSuccess) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800">
+            Check your email
+          </h1>
+
+          <p className="mt-4 text-sm text-slate-600">
+            We’ve sent a verification link to{" "}
+            <span className="font-medium">{email}</span>.
+          </p>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Please verify your email before logging in to PeerPrep.
+          </p>
+
+          <p className="mt-2 text-sm text-slate-500">
+            If you do not see the email, check your spam or junk folder.
+          </p>
+
+          <div className="mt-6">
+            <Link
+              to="/login"
+              className="inline-block rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+            >
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -269,54 +237,8 @@ export default function SignupPage() {
               )}
             </div>
           </div>
-
-          {/* Verification Code */}
-          <div className={!emailFormatValid ? "opacity-40" : ""}>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Verification Code
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Enter verification code"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                disabled={!emailFormatValid}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
-              />
-              <button
-                type="button"
-                onClick={handleGetCode}
-                disabled={!emailFormatValid}
-                className="whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Get Code
-              </button>
-              <button
-                type="button"
-                onClick={handleVerifyCode}
-                disabled={!emailFormatValid || !codeSent}
-                className="whitespace-nowrap rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Verify
-              </button>
-            </div>
-
-            <div className="mt-1 min-h-5 text-sm">
-              {codeSent && !codeVerified && !codeError && (
-                <span className="text-slate-500">
-                  Code sent. Use <strong>123456</strong> for demo.
-                </span>
-              )}
-              {codeVerified && (
-                <span className="text-green-600">✓ Email verified</span>
-              )}
-              {codeError && <span className="text-red-500">{codeError}</span>}
-            </div>
-          </div>
-
           {/* Username */}
-          <div className={!codeVerified ? "opacity-40" : ""}>
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Username
             </label>
@@ -325,13 +247,10 @@ export default function SignupPage() {
               placeholder="Choose a username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              disabled={!codeVerified}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
             <div className="mt-1 min-h-5 text-sm">
-              {!codeVerified && null}
-
-              {codeVerified && !username && (
+              {!username && (
                 <div className="text-slate-500 space-y-1">
                   <div>
                     Only lowercase letters, numbers, '-' and '_' are accepted
@@ -340,17 +259,15 @@ export default function SignupPage() {
                 </div>
               )}
 
-              {codeVerified && username && usernameError && (
+              {username && usernameError && (
                 <span className="text-red-500">✗ {usernameError}</span>
               )}
 
-              {codeVerified &&
-                username &&
+              {username &&
                 usernameFormatValid &&
                 renderStatus(usernameAvailable, usernameChecking)}
 
-              {codeVerified &&
-                username &&
+              {username &&
                 usernameFormatValid &&
                 usernameAvailable === true && (
                   <span className="ml-2 text-green-600">
@@ -365,7 +282,7 @@ export default function SignupPage() {
           </div>
 
           {/* Password */}
-          <div className={!codeVerified ? "opacity-40" : ""}>
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Password
             </label>
@@ -374,7 +291,6 @@ export default function SignupPage() {
               placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={!codeVerified}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
 
@@ -400,7 +316,7 @@ export default function SignupPage() {
           </div>
 
           {/* Confirm Password */}
-          <div className={!codeVerified ? "opacity-40" : ""}>
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Retype Password
             </label>
@@ -409,7 +325,6 @@ export default function SignupPage() {
               placeholder="Retype your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={!codeVerified}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
 

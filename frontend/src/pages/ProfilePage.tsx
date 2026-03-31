@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { getUserInfo, updateUsername } from "../services/userService";
+import {
+  deleteOwnAccount,
+  getUserInfo,
+  updateUsername,
+} from "../services/userService";
 
 type UserProfile = {
   id: string;
@@ -18,6 +22,8 @@ export default function ProfilePage() {
   const [savingUsername, setSavingUsername] = useState(false);
   const [usernameMessage, setUsernameMessage] = useState("");
   const [usernameError, setUsernameError] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     async function loadProfile() {
@@ -78,12 +84,41 @@ export default function ProfilePage() {
       setNewUsername(data.username);
       setUsernameMessage("Username updated successfully.");
       setShowUsernameEditor(false);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to update username.";
-      setUsernameError(message);
+    } catch (err: any) {
+      if (err?.code === "DUPLICATE_FIELD") {
+        setUsernameError("Username already taken.");
+      } else {
+        setUsernameError(err?.message || "Failed to update username.");
+      }
     } finally {
       setSavingUsername(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action cannot be undone.",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingAccount(true);
+      setDeleteError("");
+
+      await deleteOwnAccount();
+
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("isAdmin");
+      window.location.href = "/login";
+    } catch (err: any) {
+      if (err?.code === "LAST_ADMIN") {
+        setDeleteError("You cannot delete the last remaining admin account.");
+      } else {
+        setDeleteError(err?.message || "Failed to delete account.");
+      }
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -210,6 +245,27 @@ export default function ProfilePage() {
           <p className="mt-1 text-sm text-slate-500">
             Come back later to be able to change ur pw!
           </p>
+        </div>
+
+        <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-5">
+          <h2 className="text-lg font-semibold text-red-700">Delete Account</h2>
+          <p className="mt-1 text-sm text-red-600">
+            This will permanently delete your account. This action cannot be
+            undone.
+          </p>
+
+          {deleteError && (
+            <p className="mt-3 text-sm text-red-500">{deleteError}</p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            disabled={deletingAccount}
+            className="mt-4 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+          >
+            {deletingAccount ? "Deleting..." : "Delete Account"}
+          </button>
         </div>
       </div>
     </div>
