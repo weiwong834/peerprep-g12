@@ -48,6 +48,17 @@ async function authFetch<T>(
     if (!response.ok) {
       console.error("Request failed with status:", response.status);
       console.error("Error data:", data);
+
+      if (
+        response.status === 401 ||
+        data?.code === "INVALID_TOKEN" ||
+        data?.code === "UNAUTHORIZED"
+      ) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("isAdmin");
+        window.location.href = "/login";
+      }
+
       throw data || { message: "Request failed" };
     }
 
