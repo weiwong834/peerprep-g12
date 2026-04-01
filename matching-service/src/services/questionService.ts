@@ -3,29 +3,54 @@
  */
 
 import { Topic } from '../types/matchingEvents.js';
+import { createLogger } from '../utils/logger.js';
 
 export class QuestionService {
+	private readonly logger = createLogger('QuestionService');
+
 	constructor(private readonly questionServiceBaseUrl?: string) {}
 
+	// Check that question service is reachable on startup
 	async connect(): Promise<void> {
-		// Placeholder: Verify connection to Question Service on startup.
-		// Fetch valid topics from REST API.
 		if (this.questionServiceBaseUrl) {
-			console.log(`Using Question Service at ${this.questionServiceBaseUrl}`);
+			this.logger.info('Using question service', { questionServiceBaseUrl: this.questionServiceBaseUrl });
 		} else {
-			console.log('Using enum topics');
+			this.logger.warn('Question service not connected.');
 		}
 	}
 
 	async getValidTopics(): Promise<string[]> {
-		// Placeholder: GET /topics from question-service
-		// For now, return enum values
-		return Object.values(Topic);
+		try {
+			const response = await fetch(`${this.questionServiceBaseUrl}/topics`, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!response.ok) {
+			throw new Error(`Error fetching topics: ${response.status}`);
+			}
+
+			const topics: Array<{ name: string; is_empty: boolean }> = await response.json();
+			const validTopics = topics
+					.filter(topic => !topic.is_empty)
+					.map(topic => topic.name);
+			this.logger.info('Valid topics:', { validTopics });
+			return validTopics;
+			
+		} catch (error) {
+			this.logger.error('Failed to get topics:', {
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return [];
+		}
 	}
 
 	async validateTopic(topic: string): Promise<boolean> {
-		// Placeholder: Check if topic exists in Question Service
 		const validTopics = await this.getValidTopics();
-		return validTopics.includes(topic);
+		const isValid = validTopics.includes(topic);
+		this.logger.info('Topic validation result', { topic, isValid });
+		return isValid;
 	}
 }
