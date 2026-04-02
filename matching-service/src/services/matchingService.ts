@@ -18,6 +18,7 @@ import type { CreateSessionDTO, Session } from '../models/dto.js';
 
 const PERFECT_MATCH_TIMEOUT_MS = 30_000;
 const IMPERFECT_CONFIRMATION_TIMEOUT_MS = 30_000;
+const MAX_TOTAL_QUEUE_TIME_MS = 120_000;
 const DIFFICULTY_RANK: Record<DifficultyLevel, number> = {
 	[DifficultyLevel.EASY]: 1,
 	[DifficultyLevel.MEDIUM]: 2,
@@ -27,6 +28,7 @@ const DIFFICULTY_RANK: Record<DifficultyLevel, number> = {
 interface ActiveMatchContext {
 	socketId: string;
 	userId: string;
+	queuedSince: number;
 	perfectMatchTimer?: NodeJS.Timeout;
 	confirmationTimer?: NodeJS.Timeout;
 	proposedImperfectMatch?: CandidateMatch;
@@ -93,20 +95,19 @@ export class MatchingService {
 			return;
 		}
 
-		this.setOrResetContext(socket.id, userId);
+		this.setOrResetContext(socket.id, userId, Date.now());
 		await this.redisService.enqueueUser(userId, criteria);
 		this.logger.info('User enqueued for matching', { userId, topic: criteria.topic });
+
+		const timeoutSeconds = this.startPerfectMatchTimer(userId);
 
         // Tells frontend user is now queued
 		socket.emit(WebSocketEventType.MATCH_RESPONSE, {
 			status: MatchResponseStatus.QUEUED,
 			flowStatus: ActionFlowStatus.WAITING_PERFECT_MATCH,
-			timeoutSeconds: PERFECT_MATCH_TIMEOUT_MS / 1000,
+			timeoutSeconds,
 			message: 'Searching for a perfect match.'
 		});
-
-        // Starts 30 second timer
-		this.startPerfectMatchTimer(socket, userId);
 
 		// Placeholder: Replace this with a loop based matching logic.
 		const candidate = await this.redisService.findBestCandidate(userId);
@@ -207,7 +208,11 @@ export class MatchingService {
 				userAId: context.proposedImperfectMatch.userAId,
 				userBId: context.proposedImperfectMatch.userBId
 			});
-			await this.failImperfectMatch(context.proposedImperfectMatch, 'One user declined imperfect match.');
+			await this.failImperfectMatch(
+				context.proposedImperfectMatch,
+				'One user declined imperfect match.',
+				{ requeueEligible: true, recordRejection: true }
+			);
 			return;
 		}
 
@@ -270,7 +275,8 @@ export class MatchingService {
 		if (pending?.proposedMatch) {
 			await this.failImperfectMatch(
 				pending.proposedMatch,
-				'Match cancelled because the other user disconnected.'
+				'Match cancelled because the other user disconnected.',
+				{ requeueEligible: false, recordRejection: false }
 			);
 			this.logger.info('Disconnect cleanup completed for pending imperfect confirmation', {
 				socketId,
@@ -290,7 +296,7 @@ export class MatchingService {
 	}
 
     // Clears any old timers and sets new context for the user (gives them the most recent socket id)
-	private setOrResetContext(socketId: string, userId: string): void {
+	private setOrResetContext(socketId: string, userId: string, queuedSince: number): void {
 		const current = this.activeContextsByUserId.get(userId);
 		if (current?.perfectMatchTimer) {
 			clearTimeout(current.perfectMatchTimer);
@@ -299,27 +305,46 @@ export class MatchingService {
 			clearTimeout(current.confirmationTimer);
 		}
 
-		this.activeContextsByUserId.set(userId, { socketId, userId });
+		this.activeContextsByUserId.set(userId, { socketId, userId, queuedSince });
 		this.logger.debug('Active context set or reset', { userId, socketId });
 	}
 
-	private startPerfectMatchTimer(socket: Socket, userId: string): void {
+	private startPerfectMatchTimer(userId: string): number {
 		const context = this.activeContextsByUserId.get(userId);
 		if (!context) {
-			return;
+			return 0;
 		}
 
-        // If 30 seconds runs out, remove user from queue, delete user context, and notify frontend
-		context.perfectMatchTimer = setTimeout(async () => {
-			this.logger.info('Perfect match timer expired', { userId, timeoutMs: PERFECT_MATCH_TIMEOUT_MS });
-			await this.redisService.removeUserFromQueue(userId);
-			this.activeContextsByUserId.delete(userId);
-			socket.emit(WebSocketEventType.MATCH_RESPONSE, {
+		const elapsedMs = Date.now() - context.queuedSince;
+		const remainingTotalMs = MAX_TOTAL_QUEUE_TIME_MS - elapsedMs;
+		if (remainingTotalMs <= 0) {
+			void this.redisService.removeUserFromQueue(userId);
+			this.emitToUser(userId, {
 				status: MatchResponseStatus.MATCH_TIMEOUT,
 				flowStatus: ActionFlowStatus.TERMINATED,
-				message: 'No match found within 30 seconds.'
+				message: 'No match found within 2 minutes.'
 			});
-		}, PERFECT_MATCH_TIMEOUT_MS);
+			this.activeContextsByUserId.delete(userId);
+			return 0;
+		}
+
+		const timeoutMs = Math.min(PERFECT_MATCH_TIMEOUT_MS, remainingTotalMs);
+
+		// If the attempt timeout runs out, remove user from queue, delete user context, and notify frontend
+		context.perfectMatchTimer = setTimeout(async () => {
+			this.logger.info('Perfect match timer expired', { userId, timeoutMs });
+			await this.redisService.removeUserFromQueue(userId);
+			this.emitToUser(userId, {
+				status: MatchResponseStatus.MATCH_TIMEOUT,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: timeoutMs < PERFECT_MATCH_TIMEOUT_MS
+					? 'No match found within 2 minutes.'
+					: 'No match found within 30 seconds.'
+			});
+			this.activeContextsByUserId.delete(userId);
+		}, timeoutMs);
+
+		return Math.ceil(timeoutMs / 1000);
 	}
 
 	private async completePerfectMatch(socket: Socket, candidate: CandidateMatch): Promise<void> {
@@ -405,7 +430,10 @@ export class MatchingService {
 				userBId: resolvedCandidate.userBId,
 				timeoutMs: IMPERFECT_CONFIRMATION_TIMEOUT_MS
 			});
-			await this.failImperfectMatch(resolvedCandidate, 'Confirmation window expired.');
+			await this.failImperfectMatch(resolvedCandidate, 'Confirmation window expired.', {
+				requeueEligible: true,
+				recordRejection: false
+			});
 		}, IMPERFECT_CONFIRMATION_TIMEOUT_MS);
 
 		contextA.confirmationTimer = confirmationTimer;
@@ -450,15 +478,100 @@ export class MatchingService {
 		return DIFFICULTY_RANK[a] <= DIFFICULTY_RANK[b] ? a : b;
 	}
 
-	private async failImperfectMatch(candidate: CandidateMatch, reason: string): Promise<void> {
+	private getUpdatedRejectedCandidates(
+		existing: string[] | undefined,
+		recordRejection: boolean,
+		rejectedUserId: string
+	): string[] {
+		const normalized = Array.isArray(existing) ? existing : [];
+		if (!recordRejection) {
+			return normalized;
+		}
+
+		return Array.from(new Set([...normalized, rejectedUserId]));
+	}
+
+	private async requeueUserAfterImperfectFailure(params: {
+		userId: string;
+		criteria: CandidateMatch['criteriaA'];
+		queuedAt: number;
+		rejectedCandidates: string[];
+		reason: string;
+	}): Promise<void> {
+		const context = this.activeContextsByUserId.get(params.userId);
+		if (!context) {
+			return;
+		}
+
+		const elapsedMs = Date.now() - context.queuedSince;
+		if (elapsedMs >= MAX_TOTAL_QUEUE_TIME_MS) {
+			this.emitToUser(params.userId, {
+				status: MatchResponseStatus.MATCH_TIMEOUT,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: 'Stopped queueing after 2 minutes without a successful match.'
+			});
+			this.clearUserContext(params.userId);
+			return;
+		}
+
+		await this.redisService.requeueUserWithSameWaitingTime(
+			params.userId,
+			params.criteria,
+			params.queuedAt,
+			params.rejectedCandidates
+		);
+
+		delete context.proposedImperfectMatch;
+		delete context.confirmationTimer;
+		const timeoutSeconds = this.startPerfectMatchTimer(params.userId);
+		this.emitToUser(params.userId, {
+			status: MatchResponseStatus.QUEUED,
+			flowStatus: ActionFlowStatus.WAITING_PERFECT_MATCH,
+			timeoutSeconds,
+			message: `${params.reason} Continuing to search for another match.`
+		});
+	}
+
+	private async failImperfectMatch(
+		candidate: CandidateMatch,
+		reason: string,
+		options: { requeueEligible: boolean; recordRejection: boolean }
+	): Promise<void> {
 		this.logger.info('Failing imperfect match', {
 			userAId: candidate.userAId,
 			userBId: candidate.userBId,
-			reason
+			reason,
+			...options
 		});
 		await this.redisService.clearPendingConfirmation(candidate);
 		this.clearUserTimers(candidate.userAId);
 		this.clearUserTimers(candidate.userBId);
+
+		if (options.requeueEligible) {
+			await this.requeueUserAfterImperfectFailure({
+				userId: candidate.userAId,
+				criteria: candidate.criteriaA,
+				queuedAt: candidate.queuedAtUserA ?? Date.now(),
+				rejectedCandidates: this.getUpdatedRejectedCandidates(
+					candidate.criteriaA.rejectedCandidates,
+					options.recordRejection,
+					candidate.userBId
+				),
+				reason
+			});
+			await this.requeueUserAfterImperfectFailure({
+				userId: candidate.userBId,
+				criteria: candidate.criteriaB,
+				queuedAt: candidate.queuedAtUserB ?? Date.now(),
+				rejectedCandidates: this.getUpdatedRejectedCandidates(
+					candidate.criteriaB.rejectedCandidates,
+					options.recordRejection,
+					candidate.userAId
+				),
+				reason
+			});
+			return;
+		}
 
 		this.emitToUser(candidate.userAId, {
 			status: MatchResponseStatus.UNSUCCESSFUL_MATCH,

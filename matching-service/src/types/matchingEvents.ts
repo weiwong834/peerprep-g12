@@ -54,6 +54,7 @@ export interface MatchCriteria {
   topic: Topic;
   difficulty: DifficultyLevel;
   language: ProgrammingLanguage;
+  rejectedCandidates?: string[];
 }
 
 export interface MatchRequestPayload {

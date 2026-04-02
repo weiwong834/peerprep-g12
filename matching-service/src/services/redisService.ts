@@ -11,6 +11,7 @@ interface WaitingUser {
 	userId: string;
 	criteria: MatchCriteria;
 	queuedAt: number;
+	rejectedCandidates: string[];
 }
 
 interface SerializedPendingConfirmationState {
@@ -74,7 +75,19 @@ export class RedisService {
 		}
 
 		try {
-			return JSON.parse(value) as WaitingUser;
+			const parsed = JSON.parse(value) as Partial<WaitingUser>;
+			if (!parsed.userId || !parsed.criteria || typeof parsed.queuedAt !== 'number') {
+				return null;
+			}
+
+			return {
+				userId: parsed.userId,
+				criteria: parsed.criteria,
+				queuedAt: parsed.queuedAt,
+				rejectedCandidates: Array.isArray(parsed.rejectedCandidates)
+					? parsed.rejectedCandidates
+					: []
+			};
 		} catch (error) {
 			this.logger.error('Failed to parse waiting user payload', {
 				error: error instanceof Error ? error.message : String(error),
@@ -125,8 +138,12 @@ export class RedisService {
 
 		const waitingUser: WaitingUser = {
 			userId,
-			criteria,
-			queuedAt: Date.now()
+			criteria: {
+				...criteria,
+				rejectedCandidates: []
+			},
+			queuedAt: Date.now(),
+			rejectedCandidates: []
 		};
 
 		const queueKey = this.buildTopicQueueKey(criteria);
@@ -143,6 +160,37 @@ export class RedisService {
 			queueKey,
 			queueSize,
 			criteria
+		});
+	}
+
+	async requeueUserWithSameWaitingTime(
+		userId: string,
+		criteria: MatchCriteria,
+		queuedAt: number,
+		rejectedCandidates: string[]
+	): Promise<void> {
+		const waitingUser: WaitingUser = {
+			userId,
+			criteria: {
+				...criteria,
+				rejectedCandidates: Array.from(new Set(rejectedCandidates))
+			},
+			queuedAt,
+			rejectedCandidates: Array.from(new Set(rejectedCandidates))
+		};
+
+		const queueKey = this.buildTopicQueueKey(criteria);
+
+		await this.client.multi()
+			.set(this.buildWaitingUserKey(userId), JSON.stringify(waitingUser))
+			.zAdd(queueKey, { score: queuedAt, value: userId })
+			.exec();
+
+		this.logger.info('User re-enqueued with preserved waiting time', {
+			userId,
+			queueKey,
+			queuedAt,
+			rejectedCandidatesCount: waitingUser.rejectedCandidates.length
 		});
 	}
 
@@ -224,6 +272,19 @@ export class RedisService {
 		let bestScore = -1;
 		// Loop through candidates and calculate compatibility score
 		for (const candidate of candidatePool) {
+			// Skip candidate if either side has candidate in rejected list (previously unsuccessfully matched)
+			const requesterRejectedCandidate = requester.rejectedCandidates.includes(candidate.userId);
+			const candidateRejectedRequester = candidate.rejectedCandidates.includes(requestingUserId);
+			if (requesterRejectedCandidate || candidateRejectedRequester) {
+				this.logger.debug('Skipping candidate due to prior rejection', {
+					requestingUserId,
+					candidateUserId: candidate.userId,
+					requesterRejectedCandidate,
+					candidateRejectedRequester
+				});
+				continue;
+			}
+
 			const score = this.calculateCompatibilityScore(requester.criteria, candidate.criteria);
 			this.logger.debug('Compatibility score calculated', {
 				requestingUserId,
