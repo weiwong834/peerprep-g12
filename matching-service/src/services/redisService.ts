@@ -170,6 +170,18 @@ export class RedisService {
 		});
 	}
 
+	// Check if user is currently in queue
+	async isUserQueued(userId: string): Promise<boolean> {
+		const waitingUser = this.parseWaitingUser(await this.client.get(this.buildWaitingUserKey(userId)));
+		return waitingUser !== null;
+	}
+
+	// Check if user has pending imperfect match confirmation
+	async hasPendingConfirmationState(userId: string): Promise<boolean> {
+		const pending = await this.getPendingConfirmationByUser(userId);
+		return pending !== null;
+	}
+
 	async findBestCandidate(requestingUserId: string): Promise<CandidateMatch | null> {
 		// Turn text back into WaitingUser typescript interface
 		const requester = this.parseWaitingUser(await this.client.get(this.buildWaitingUserKey(requestingUserId)));

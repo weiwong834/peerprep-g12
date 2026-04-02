@@ -145,6 +145,29 @@ export class MatchingService {
 	async handleCancelRequest(socket: Socket, payload: CancelRequestPayload): Promise<void> {
 		const { userId } = payload;
 		this.logger.info('Handling cancel request', { userId, socketId: socket.id });
+		const isQueued = await this.redisService.isUserQueued(userId);
+		const hasPendingConfirmation = await this.redisService.hasPendingConfirmationState(userId);
+
+		if (!isQueued || hasPendingConfirmation) {
+			this.logger.warn('Cancel request rejected due to invalid state', {
+				userId,
+				isQueued,
+				hasPendingConfirmation
+			});
+			socket.emit(WebSocketEventType.CANCEL_RESPONSE, {
+				status: hasPendingConfirmation 
+					? MatchResponseStatus.IMPERFECT_MATCH_NEEDS_CONFIRMATION 
+					: MatchResponseStatus.UNSUCCESSFUL_MATCH,
+				flowStatus: hasPendingConfirmation
+					? ActionFlowStatus.WAITING_IMPERFECT_CONFIRMATION
+					: ActionFlowStatus.TERMINATED,
+				message: hasPendingConfirmation
+					? 'Cannot cancel while an imperfect match confirmation is pending.'
+					: 'Cannot cancel because user is not currently queued.'
+			});
+			return;
+		}
+
 		const context = this.activeContextsByUserId.get(userId);
 
 		if (context?.perfectMatchTimer) {
