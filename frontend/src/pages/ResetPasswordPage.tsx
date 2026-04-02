@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { resetPassword } from "../services/userService";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -7,6 +8,8 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const passwordChecks = useMemo(
     () => ({
@@ -37,16 +40,35 @@ export default function ResetPasswordPage() {
     );
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
 
     if (!(passwordValid && passwordsMatch)) return;
 
-    setSubmitted(true);
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
 
-    setTimeout(() => {
-      navigate("/login");
-    }, 1200);
+    if (!accessToken || !refreshToken) {
+      setError("Invalid or expired reset link.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await resetPassword(password, refreshToken, accessToken);
+      setSubmitted(true);
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 1200);
+    } catch (err: any) {
+      setError(err?.message || "Failed to reset password.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -68,7 +90,10 @@ export default function ResetPasswordPage() {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
             </div>
@@ -100,7 +125,10 @@ export default function ResetPasswordPage() {
               <input
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setError("");
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
               <div className="mt-1 min-h-5 text-sm">
@@ -113,12 +141,14 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
             <button
               type="submit"
-              disabled={!(passwordValid && passwordsMatch)}
+              disabled={submitting || !(passwordValid && passwordsMatch)}
               className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Reset Password
+              {submitting ? "Resetting..." : "Reset Password"}
             </button>
           </form>
         ) : (
