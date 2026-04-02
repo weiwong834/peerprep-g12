@@ -109,7 +109,6 @@ export class MatchingService {
 			message: 'Searching for a perfect match.'
 		});
 
-		// Placeholder: Replace this with a loop based matching logic.
 		const candidate = await this.redisService.findBestCandidate(userId);
 		if (!candidate) {
 			this.logger.debug('No match found yet', { userId });
@@ -430,10 +429,7 @@ export class MatchingService {
 				userBId: resolvedCandidate.userBId,
 				timeoutMs: IMPERFECT_CONFIRMATION_TIMEOUT_MS
 			});
-			await this.failImperfectMatch(resolvedCandidate, 'Confirmation window expired.', {
-				requeueEligible: true,
-				recordRejection: false
-			});
+			await this.expireImperfectMatchConfirmation(resolvedCandidate, 'Confirmation window expired.');
 		}, IMPERFECT_CONFIRMATION_TIMEOUT_MS);
 
 		contextA.confirmationTimer = confirmationTimer;
@@ -586,6 +582,70 @@ export class MatchingService {
 
 		this.clearUserContext(candidate.userAId);
 		this.clearUserContext(candidate.userBId);
+	}
+
+	private async expireImperfectMatchConfirmation(candidate: CandidateMatch, reason: string): Promise<void> {
+		this.logger.info('Expiring imperfect match confirmation', {
+			userAId: candidate.userAId,
+			userBId: candidate.userBId,
+			reason
+		});
+
+		const pending =
+			(await this.redisService.getPendingConfirmationByUser(candidate.userAId)) ??
+			(await this.redisService.getPendingConfirmationByUser(candidate.userBId));
+		if (!pending) {
+			this.logger.warn('Pending confirmation state not found while expiring imperfect match', {
+				userAId: candidate.userAId,
+				userBId: candidate.userBId
+			});
+			return;
+		}
+
+		// Check in case both users confirmed while the timer callback was waiting to execute
+		if (
+			pending.acceptedUserIds.has(candidate.userAId) &&
+			pending.acceptedUserIds.has(candidate.userBId)
+		) {
+			this.logger.debug('Ignoring confirmation timeout because both users already confirmed', {
+				userAId: candidate.userAId,
+				userBId: candidate.userBId
+			});
+			return;
+		}
+
+		await this.redisService.clearPendingConfirmation(candidate);
+		this.clearUserTimers(candidate.userAId);
+		this.clearUserTimers(candidate.userBId);
+
+		const confirmedUserIds = [candidate.userAId, candidate.userBId].filter((userId) =>
+			pending.acceptedUserIds.has(userId)
+		);
+		
+		const timedOutUserIds = [candidate.userAId, candidate.userBId].filter(
+			(userId) => !pending.acceptedUserIds.has(userId)
+		);
+
+		for (const userId of confirmedUserIds) {
+			const criteria = userId === candidate.userAId ? candidate.criteriaA : candidate.criteriaB;
+			const queuedAt = userId === candidate.userAId ? candidate.queuedAtUserA ?? Date.now() : candidate.queuedAtUserB ?? Date.now();
+			await this.requeueUserAfterImperfectFailure({
+				userId,
+				criteria,
+				queuedAt,
+				rejectedCandidates: criteria.rejectedCandidates ?? [],
+				reason
+			});
+		}
+
+		for (const userId of timedOutUserIds) {
+			this.emitToUser(userId, {
+				status: MatchResponseStatus.MATCH_TIMEOUT,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: reason
+			});
+			this.clearUserContext(userId);
+		}
 	}
 
 	private async finalizeConfirmedImperfectMatch(candidate: CandidateMatch): Promise<void> {
