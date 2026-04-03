@@ -24,7 +24,7 @@ export type Topic = {
   is_empty: boolean;
 };
 
-async function questionFetch<T>(
+async function publicQuestionFetch<T>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
@@ -45,8 +45,35 @@ async function questionFetch<T>(
   return data;
 }
 
+async function authQuestionFetch<T>(
+  url: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = localStorage.getItem("accessToken");
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(data?.error || "Unauthorized");
+    }
+    throw new Error(data?.error || "Question service request failed");
+  }
+
+  return data;
+}
+
 export async function getTopics() {
-  return questionFetch<Topic[]>(`${API_BASE}/topics`);
+  return publicQuestionFetch<Topic[]>(`${API_BASE}/topics`);
 }
 
 export async function getQuestions(filters?: {
@@ -65,7 +92,7 @@ export async function getQuestions(filters?: {
     ? `${API_BASE}/questions?${query}`
     : `${API_BASE}/questions`;
 
-  return questionFetch<Question[]>(url);
+  return authQuestionFetch<Question[]>(url);
 }
 
 export async function createQuestion(payload: {
@@ -74,7 +101,7 @@ export async function createQuestion(payload: {
   difficulty: string;
   topics: string[];
 }) {
-  return questionFetch<Question>(`${API_BASE}/questions`, {
+  return authQuestionFetch<Question>(`${API_BASE}/questions`, {
     method: "POST",
     body: JSON.stringify({
       title: payload.title,
@@ -99,28 +126,31 @@ export async function editQuestion(
     topics?: string[];
   },
 ) {
-  return questionFetch<Question>(`${API_BASE}/questions/${questionNumber}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      title: payload.title,
-      difficulty: payload.difficulty,
-      topics: payload.topics,
-      ...(payload.description !== undefined
-        ? {
-            blocks: [
-              {
-                block_type: "text",
-                content: payload.description,
-              },
-            ],
-          }
-        : {}),
-    }),
-  });
+  return authQuestionFetch<Question>(
+    `${API_BASE}/questions/${questionNumber}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        title: payload.title,
+        difficulty: payload.difficulty,
+        topics: payload.topics,
+        ...(payload.description !== undefined
+          ? {
+              blocks: [
+                {
+                  block_type: "text",
+                  content: payload.description,
+                },
+              ],
+            }
+          : {}),
+      }),
+    },
+  );
 }
 
 export async function archiveQuestion(questionNumber: string | number) {
-  return questionFetch<Question>(
+  return authQuestionFetch<Question>(
     `${API_BASE}/questions/${questionNumber}/archive`,
     {
       method: "PATCH",
@@ -129,7 +159,7 @@ export async function archiveQuestion(questionNumber: string | number) {
 }
 
 export async function restoreQuestion(questionNumber: string | number) {
-  return questionFetch<Question>(
+  return authQuestionFetch<Question>(
     `${API_BASE}/questions/${questionNumber}/restore`,
     {
       method: "PATCH",
@@ -138,8 +168,12 @@ export async function restoreQuestion(questionNumber: string | number) {
 }
 
 export async function deleteQuestion(questionNumber: string | number) {
+  const token = localStorage.getItem("accessToken");
   const response = await fetch(`${API_BASE}/questions/${questionNumber}`, {
     method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 
   if (!response.ok) {
@@ -149,7 +183,7 @@ export async function deleteQuestion(questionNumber: string | number) {
 }
 
 export async function createTopic(name: string) {
-  return questionFetch<Topic>(`${API_BASE}/topics`, {
+  return authQuestionFetch<Topic>(`${API_BASE}/topics`, {
     method: "POST",
     body: JSON.stringify({ name }),
   });
