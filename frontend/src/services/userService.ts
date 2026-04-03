@@ -48,6 +48,17 @@ async function authFetch<T>(
     if (!response.ok) {
       console.error("Request failed with status:", response.status);
       console.error("Error data:", data);
+
+      if (
+        response.status === 401 ||
+        data?.code === "INVALID_TOKEN" ||
+        data?.code === "UNAUTHORIZED"
+      ) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("isAdmin");
+        window.location.href = "/login";
+      }
+
       throw data || { message: "Request failed" };
     }
 
@@ -109,6 +120,33 @@ export async function checkUniqueUsername(username: string) {
       method: "GET",
     },
   );
+}
+
+export async function requestResetPassword(email: string) {
+  return authFetch<{
+    code?: string;
+    message?: string;
+  }>(`${API_BASE}/auth/requestResetPassword`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  password: string,
+  refreshToken: string,
+  accessToken: string,
+) {
+  return authFetch<{
+    code?: string;
+    message?: string;
+  }>(`${API_BASE}/auth/resetPassword`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ password, refreshToken }),
+  });
 }
 
 export async function getUserInfo() {

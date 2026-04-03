@@ -1,4 +1,18 @@
 services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_USER_SERVICE_URL=http://localhost:3000
+      - VITE_QUESTION_SERVICE_URL=http://localhost:3001
+      - VITE_MATCHING_SERVICE_URL=http://localhost:3002
+      - VITE_COLLAB_SERVICE_URL=http://localhost:3003
+    depends_on:
+      - matching-service
+      - user-service
+      - question-service
+      - collab-service
   matching-service:
     build: ./matching-service
     ports:

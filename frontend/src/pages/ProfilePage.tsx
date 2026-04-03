@@ -3,6 +3,7 @@ import {
   deleteOwnAccount,
   getUserInfo,
   updateUsername,
+  requestResetPassword,
 } from "../services/userService";
 
 type UserProfile = {
@@ -22,6 +23,9 @@ export default function ProfilePage() {
   const [savingUsername, setSavingUsername] = useState(false);
   const [usernameMessage, setUsernameMessage] = useState("");
   const [usernameError, setUsernameError] = useState("");
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
@@ -119,6 +123,25 @@ export default function ProfilePage() {
       }
     } finally {
       setDeletingAccount(false);
+    }
+  }
+
+  async function handleSendPasswordResetEmail() {
+    if (!user) return;
+
+    try {
+      setSendingResetEmail(true);
+      setPasswordMessage("");
+      setPasswordError("");
+
+      await requestResetPassword(user.email);
+      setPasswordMessage(
+        "A password reset link has been sent to your email. Please check your inbox and spam folder.",
+      );
+    } catch (err: any) {
+      setPasswordError(err?.message || "Failed to send password reset email.");
+    } finally {
+      setSendingResetEmail(false);
     }
   }
 
@@ -243,8 +266,24 @@ export default function ProfilePage() {
         <div className="mt-8 rounded-xl border border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-800">Password</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Come back later to be able to change ur pw!
+            We’ll send a password reset link to your registered email.
           </p>
+
+          {passwordMessage && (
+            <p className="mt-3 text-sm text-green-600">{passwordMessage}</p>
+          )}
+          {passwordError && (
+            <p className="mt-3 text-sm text-red-500">{passwordError}</p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSendPasswordResetEmail}
+            disabled={sendingResetEmail}
+            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {sendingResetEmail ? "Sending..." : "Send Password Reset Email"}
+          </button>
         </div>
 
         <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-5">

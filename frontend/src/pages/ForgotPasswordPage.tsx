@@ -1,58 +1,36 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { requestResetPassword } from "../services/userService";
 
 export default function ForgotPasswordPage() {
-  const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-
-  const [emailValid, setEmailValid] = useState<boolean | null>(null);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-
   const [error, setError] = useState("");
-  const [otpError, setOtpError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  function validateEmail(input: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
-  }
+  const emailFormatValid = useMemo(() => {
+    if (!email) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }, [email]);
 
-  function handleSendOtp(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setOtpError("");
-    setOtpVerified(false);
 
-    if (!validateEmail(email)) {
-      setEmailValid(false);
+    if (!emailFormatValid) {
       setError("Please enter a valid email address.");
       return;
     }
 
-    setEmailValid(true);
-    setOtpSent(true);
-  }
-
-  function handleVerifyOtp() {
-    setOtpError("");
-
-    if (!otp.trim()) {
-      setOtpError("Please enter the OTP.");
-      return;
+    try {
+      setSending(true);
+      await requestResetPassword(email);
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || "Failed to send reset email.");
+    } finally {
+      setSending(false);
     }
-
-    // mock OTP
-    if (otp.trim() !== "654321") {
-      setOtpVerified(false);
-      setOtpError("Incorrect OTP.");
-      return;
-    }
-
-    setOtpVerified(true);
-
-    // move to reset password page
-    navigate("/reset-password");
   }
 
   return (
@@ -61,71 +39,54 @@ export default function ForgotPasswordPage() {
         <h1 className="text-2xl font-bold text-slate-800 text-center">
           Forgot Password
         </h1>
-        <p className="mt-2 text-center text-sm text-slate-500">
-          Enter your email to receive a one-time password
-        </p>
 
-        <form onSubmit={handleSendOtp} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          {emailValid && !error && (
-            <p className="text-sm text-green-600">✓ Valid email format</p>
-          )}
-
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700"
-          >
-            Send OTP
-          </button>
-        </form>
-
-        {otpSent && (
-          <div className="mt-6 space-y-4 rounded-lg border border-slate-200 p-4">
-            <p className="text-sm text-slate-600">
-              OTP sent. For demo, use <strong>654321</strong>.
+        {!submitted ? (
+          <>
+            <p className="mt-2 text-center text-sm text-slate-500">
+              Enter your email and we’ll send you a password reset link.
             </p>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Enter OTP
-              </label>
-              <input
-                type="text"
-                placeholder="6-digit OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                <div className="mt-1 min-h-5 text-sm">
+                  {email && !emailFormatValid && (
+                    <span className="text-red-500">✗ Invalid email format</span>
+                  )}
+                </div>
+              </div>
 
-            {otpError && <p className="text-sm text-red-500">{otpError}</p>}
+              {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <button
-              type="button"
-              onClick={handleVerifyOtp}
-              className="w-full rounded-lg bg-slate-800 py-2 font-medium text-white transition hover:bg-slate-900"
-            >
-              Verify OTP
-            </button>
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {sending ? "Sending..." : "Send Reset Link"}
+              </button>
+            </form>
+          </>
+        ) : (
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            A password reset link has been sent to <strong>{email}</strong>.
+            Please check your inbox and spam folder.
           </div>
         )}
 
         <div className="mt-5 text-center text-sm text-slate-600">
-          Remembered your password?{" "}
           <Link to="/login" className="text-blue-600 hover:underline">
             Back to login
           </Link>
