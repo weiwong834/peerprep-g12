@@ -15,13 +15,13 @@ const fetchQuestionFromService = async (topic: string, difficulty: string): Prom
     throw new Error(`Failed to fetch question from Question Service: ${response.statusText}`);
   }
 
-  const data = await response.json() as { id: string };
+  const data = await response.json() as { question_id: string };
   
-  if (!data.id) {
+  if (!data.question_id) {
     throw new Error('Question Service returned no question ID');
   }
 
-  return data.id;
+  return data.question_id;
 };
 
 export const createSession = async (dto: CreateSessionDTO): Promise<Session> => {
