@@ -4,14 +4,19 @@ type QuestionTopic = {
   topic: string;
 };
 
+type QuestionBlock = {
+  block_type: "text" | "image";
+  content: string;
+};
+
 export type Question = {
   id: string;
   question_number: string | number;
   title: string;
-  description: string;
   difficulty: string;
   availability_status: string;
   question_topics?: QuestionTopic[];
+  blocks?: QuestionBlock[];
 };
 
 export type Topic = {
@@ -71,7 +76,17 @@ export async function createQuestion(payload: {
 }) {
   return questionFetch<Question>(`${API_BASE}/questions`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      title: payload.title,
+      difficulty: payload.difficulty,
+      topics: payload.topics,
+      blocks: [
+        {
+          block_type: "text",
+          content: payload.description,
+        },
+      ],
+    }),
   });
 }
 
@@ -86,7 +101,21 @@ export async function editQuestion(
 ) {
   return questionFetch<Question>(`${API_BASE}/questions/${questionNumber}`, {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      title: payload.title,
+      difficulty: payload.difficulty,
+      topics: payload.topics,
+      ...(payload.description !== undefined
+        ? {
+            blocks: [
+              {
+                block_type: "text",
+                content: payload.description,
+              },
+            ],
+          }
+        : {}),
+    }),
   });
 }
 

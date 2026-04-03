@@ -234,7 +234,7 @@ export default function AdminPage() {
   function startEditing(question: Question) {
     setEditingQuestionId(question.id);
     setEditTitle(question.title);
-    setEditDescription(question.description);
+    setEditDescription(getQuestionPreview(question));
     setEditDifficulty(question.difficulty);
     setEditTopics(question.question_topics?.map((t) => t.topic) || []);
     setEditMessage("");
@@ -250,6 +250,22 @@ export default function AdminPage() {
     setEditTopics([]);
     setEditMessage("");
     setEditError("");
+  }
+
+  function getQuestionPreview(question: Question) {
+    const textContent = (question.blocks ?? [])
+      .filter((block) => block.block_type === "text")
+      .map((block) => block.content)
+      .join("\n\n");
+
+    return textContent;
+  }
+
+  function getQuestionTextPreview(question: Question) {
+    return (question.blocks ?? [])
+      .filter((block) => block.block_type === "text")
+      .map((block) => block.content)
+      .join("\n\n");
   }
 
   async function handleEditQuestion(
@@ -772,13 +788,41 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-600">
-                          {isExpanded
-                            ? question.description
-                            : question.description.length > 220
-                              ? `${question.description.slice(0, 220)}...`
-                              : question.description}
-                        </p>
+                        <div className="mt-3 space-y-4 text-sm text-slate-600">
+                          {isExpanded ? (
+                            (question.blocks ?? []).map((block, index) => {
+                              if (block.block_type === "image") {
+                                return (
+                                  <img
+                                    key={`${question.id}-block-${index}`}
+                                    src={block.content}
+                                    alt={`Question block ${index + 1}`}
+                                    className="max-h-96 w-auto rounded-lg border border-slate-200"
+                                  />
+                                );
+                              }
+
+                              return (
+                                <p
+                                  key={`${question.id}-block-${index}`}
+                                  className="whitespace-pre-wrap"
+                                >
+                                  {block.content}
+                                </p>
+                              );
+                            })
+                          ) : (
+                            <p className="whitespace-pre-wrap">
+                              {(() => {
+                                const preview =
+                                  getQuestionTextPreview(question);
+                                return preview.length > 220
+                                  ? `${preview.slice(0, 220)}...`
+                                  : preview;
+                              })()}
+                            </p>
+                          )}
+                        </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
                           {question.question_topics?.map((topicObj) => (
