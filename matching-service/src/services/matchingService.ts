@@ -312,6 +312,12 @@ export class MatchingService {
 		const pending = await this.redisService.getPendingConfirmationByUser(userId);
 		if (!pending?.proposedMatch) {
 			await this.redisService.removeUserFromQueue(userId);
+			// Notify the banned user immediately
+			this.emitToUser(userId, {
+				status: MatchResponseStatus.MATCH_TIMEOUT,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: 'You are temporarily banned from matching.'
+			});
 			this.clearUserContext(userId);
 			return;
 		}
