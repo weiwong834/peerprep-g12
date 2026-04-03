@@ -42,6 +42,7 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false);
   const [createMessage, setCreateMessage] = useState("");
   const [createError, setCreateError] = useState("");
+  const [questionSearch, setQuestionSearch] = useState("");
 
   const [showAddTopicInput, setShowAddTopicInput] = useState(false);
   const [newTopicName, setNewTopicName] = useState("");
@@ -399,6 +400,38 @@ export default function AdminPage() {
     }
   }
 
+  const filteredQuestions = useMemo(() => {
+    const keyword = questionSearch.trim();
+    if (!keyword) return questions;
+
+    const exactNumberMatch = keyword.match(/^#(\d+)$/);
+
+    if (exactNumberMatch) {
+      const targetNumber = exactNumberMatch[1];
+      return questions.filter(
+        (question) => String(question.question_number) === targetNumber,
+      );
+    }
+
+    const loweredKeyword = keyword.toLowerCase();
+
+    return questions.filter((question) => {
+      const preview = getQuestionTextPreview(question).toLowerCase();
+      const topicNames = (question.question_topics ?? [])
+        .map((topicObj) => topicObj.topic.toLowerCase())
+        .join(" ");
+
+      return (
+        question.title.toLowerCase().includes(loweredKeyword) ||
+        String(question.question_number).includes(loweredKeyword) ||
+        question.difficulty.toLowerCase().includes(loweredKeyword) ||
+        question.availability_status.toLowerCase().includes(loweredKeyword) ||
+        preview.includes(loweredKeyword) ||
+        topicNames.includes(loweredKeyword)
+      );
+    });
+  }, [questions, questionSearch]);
+
   const filteredUsers = useMemo(() => {
     const keyword = userSearch.trim().toLowerCase();
     if (!keyword) return users;
@@ -667,18 +700,31 @@ export default function AdminPage() {
               </div>
             </div>
 
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Search Questions
+              </label>
+              <input
+                type="text"
+                value={questionSearch}
+                onChange={(e) => setQuestionSearch(e.target.value)}
+                placeholder="Search by title, topic, content, or #question-number"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+
             {error && <p className="mt-4 text-sm text-red-500">{error}</p>}
 
             <div className="mt-6">
               {loadingQuestions ? (
                 <p className="text-sm text-slate-500">Loading questions...</p>
-              ) : questions.length === 0 ? (
+              ) : filteredQuestions.length === 0 ? (
                 <p className="text-sm text-slate-500">
                   No questions found for the selected filters.
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {questions.map((question) => {
+                  {filteredQuestions.map((question) => {
                     const isExpanded = expandedQuestionId === question.id;
 
                     return (
