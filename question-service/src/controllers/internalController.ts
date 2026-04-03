@@ -54,15 +54,5 @@ export async function fetchQuestionForSession(req: Request, res: Response) {
     const randomIndex = Math.floor(Math.random() * questions.length);
     const selected = questions[randomIndex];
 
-    //Fetch and attach blocks
-    const { data: blocks, error: blockError } = await supabase
-        .schema('questionservice')
-        .from('question_blocks')
-        .select('block_order, block_type, content')
-        .eq('question_id', selected.id)
-        .order('block_order', { ascending: true });
-    
-    if (blockError) return res.status(500).json({ error: blockError.message });
-
-    return res.status(200).json({ ...selected, blocks: blocks ?? [] });
+    return res.status(200).json({ question_id : selected.id });
 }
