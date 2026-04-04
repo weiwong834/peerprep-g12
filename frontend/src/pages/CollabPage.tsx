@@ -7,9 +7,9 @@ type CollabState =
   | "connecting"
   | "waiting"
   | "confirming"
-  | "matched"
   | "active"
-  | "error";
+  | "error"
+  | "banned";
 
 type MatchResponseStatus =
   | "queued"
@@ -66,6 +66,10 @@ export default function CollabPage() {
     null,
   );
 
+  const [confirmationChoice, setConfirmationChoice] = useState<
+    "accepted" | "declined" | null
+  >(null);
+
   useEffect(() => {
     let mounted = true;
 
@@ -100,6 +104,10 @@ export default function CollabPage() {
         if (!mounted) return;
         setIsConnected(false);
         console.log("Disconnected from matching service:", reason);
+
+        if (state !== "active") {
+          setMessage("Disconnected from matching service.");
+        }
       });
 
       socket.on("connect_error", (error) => {
@@ -114,9 +122,11 @@ export default function CollabPage() {
         console.log("MATCH_RESPONSE:", payload);
 
         setMessage(payload.message || "");
-        if (typeof payload.timeoutSeconds === "number") {
-          setCountdown(payload.timeoutSeconds);
-        }
+        setCountdown(
+          typeof payload.timeoutSeconds === "number"
+            ? payload.timeoutSeconds
+            : null,
+        );
 
         switch (payload.status) {
           case "queued":
@@ -128,41 +138,50 @@ export default function CollabPage() {
           case "imperfect_match_needs_confirmation":
             setState("confirming");
             setProposedMatch(payload.proposedMatch || null);
+            setConfirmationChoice(null);
             break;
 
           case "perfect_match_found":
-            // optional intermediate state
-            setState("matched");
             if (payload.sessionId) {
               setSessionId(payload.sessionId);
             }
+            setProposedMatch(null);
+            setConfirmationChoice(null);
+            setState("active");
             break;
 
           case "match_success":
-            setState("matched");
             setProposedMatch(null);
+            setConfirmationChoice(null);
             if (payload.sessionId) {
               setSessionId(payload.sessionId);
             }
+            setState("active");
             break;
 
           case "match_timeout":
             setState("error");
             setProposedMatch(null);
-            setCountdown(null);
+            setSessionId("");
             break;
 
           case "unsuccessful_match":
-            setState("error");
             setProposedMatch(null);
-            setCountdown(null);
+            setSessionId("");
+
+            if (
+              (payload.message || "")
+                .toLowerCase()
+                .includes("temporarily banned")
+            ) {
+              setState("banned");
+            } else {
+              setState("error");
+            }
             break;
 
           case "cancelled":
-            setState("idle");
-            setProposedMatch(null);
-            setCountdown(null);
-            setSessionId("");
+            resetMatchState("idle");
             setMessage(payload.message || "Matching cancelled.");
             break;
 
@@ -173,11 +192,27 @@ export default function CollabPage() {
 
       socket.on("cancel_response", (payload: MatchResponsePayload) => {
         console.log("CANCEL_RESPONSE:", payload);
-        setState("idle");
-        setMessage(payload.message || "Matching cancelled.");
-        setProposedMatch(null);
-        setCountdown(null);
-        setSessionId("");
+        setMessage(payload.message || "");
+
+        switch (payload.status) {
+          case "cancelled":
+            resetMatchState("idle");
+            setMessage(payload.message || "Matching cancelled.");
+            break;
+
+          case "imperfect_match_needs_confirmation":
+            setState("confirming");
+            break;
+
+          case "unsuccessful_match":
+            // Do not force idle, because backend may be telling us
+            // the user was not queued / cancel was invalid
+            setState((prev) => prev);
+            break;
+
+          default:
+            break;
+        }
       });
     }
 
@@ -230,10 +265,24 @@ export default function CollabPage() {
   function handleConfirmMatch(accepted: boolean) {
     if (!socketRef.current || !isConnected || !userId) return;
 
+    setConfirmationChoice(accepted ? "accepted" : "declined");
+
+    if (accepted) {
+      setMessage("You accepted the match. Waiting for the other user...");
+    }
+
     socketRef.current.emit("confirm_request", {
       userId,
       accepted,
     });
+  }
+
+  function resetMatchState(nextState: CollabState = "idle") {
+    setState(nextState);
+    setCountdown(null);
+    setProposedMatch(null);
+    setSessionId("");
+    setConfirmationChoice(null);
   }
 
   function handleEnterRoom() {
@@ -248,6 +297,7 @@ export default function CollabPage() {
     setProposedMatch(null);
     setMessage("");
     setCountdown(null);
+    setConfirmationChoice(null);
   }
 
   if (state === "connecting") {
@@ -412,50 +462,35 @@ export default function CollabPage() {
             </p>
           )}
 
-          <button
-            onClick={() => handleConfirmMatch(true)}
-            className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
-          >
-            Accept Match
-          </button>
-
-          <button
-            onClick={() => handleConfirmMatch(false)}
-            className="w-full border py-2 rounded-lg hover:bg-gray-100"
-          >
-            Decline Match
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === "matched") {
-    return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">Match Found</h1>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm text-center space-y-4 border border-green-200">
-          <h2 className="text-xl font-semibold text-slate-800">
-            We found you a match!
-          </h2>
-
-          <p className="text-slate-600">
-            {message || "Your collaboration session is ready."}
-          </p>
-
-          {sessionId && (
-            <p className="text-sm text-slate-500 break-all">
-              Session ID: <strong>{sessionId}</strong>
+          {confirmationChoice === "accepted" && (
+            <p className="text-sm text-green-600 text-center">
+              You accepted the match. Waiting for the other user...
             </p>
           )}
 
-          <button
-            onClick={handleEnterRoom}
-            className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
-          >
-            Enter Room
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleConfirmMatch(true)}
+              className={`w-full py-2 rounded-lg transition ${
+                confirmationChoice === "accepted"
+                  ? "bg-green-200 text-green-800 ring-2 ring-green-500"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
+            >
+              Accept Match
+            </button>
+
+            <button
+              onClick={() => handleConfirmMatch(false)}
+              className={`w-full py-2 rounded-lg border transition ${
+                confirmationChoice === "declined"
+                  ? "bg-red-100 text-red-700 border-red-300 ring-2 ring-red-400"
+                  : "hover:bg-gray-100"
+              }`}
+            >
+              Decline Match
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -493,6 +528,32 @@ export default function CollabPage() {
     );
   }
 
+  if (state === "banned") {
+    return (
+      <div className="max-w-xl">
+        <h1 className="text-2xl font-bold mb-6">Matching Unavailable</h1>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm space-y-4 border border-red-200">
+          <p className="text-slate-700">
+            {message || "You are temporarily banned from matching."}
+          </p>
+
+          <button
+            onClick={() => {
+              setState("idle");
+              setCountdown(null);
+              setProposedMatch(null);
+              setSessionId("");
+            }}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (state === "error") {
     return (
       <div className="max-w-xl">
@@ -503,10 +564,7 @@ export default function CollabPage() {
 
           <button
             onClick={() => {
-              setState("idle");
-              setCountdown(null);
-              setProposedMatch(null);
-              setSessionId("");
+              resetMatchState("idle");
               setMessage("");
             }}
             className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
