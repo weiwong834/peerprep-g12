@@ -6,3 +6,4 @@ dist/
 matching-service/run-tests.sh
 matching-service/test-client.ts
 matching-service/test-concurrent-score.ts
+matching-service/.env.docker
