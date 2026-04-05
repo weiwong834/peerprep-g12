@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { getUserInfo } from "../services/userService";
+import CollaborationRoom from "../components/CollaborationRoom";
+import { getSession, getActiveSession, type Session } from "../services/collaborationService";
+import { getQuestionById, type Question } from "../services/questionService";
 
 type CollabState =
   | "idle"
@@ -49,9 +52,6 @@ type MatchResponsePayload = {
 const MATCHING_SERVER_URL =
   import.meta.env.VITE_MATCHING_SERVICE_URL || "http://localhost:3002";
 
-const COLLAB_SERVER_URL =
-  import.meta.env.VITE_COLLAB_SERVICE_URL || "http://localhost:3003";
-
 export default function CollabPage() {
   const socketRef = useRef<Socket | null>(null);
 
@@ -59,6 +59,7 @@ export default function CollabPage() {
   const [isConnected, setIsConnected] = useState(false);
 
   const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState("");
   const [language, setLanguage] = useState("javascript");
@@ -69,164 +70,187 @@ export default function CollabPage() {
   const [proposedMatch, setProposedMatch] = useState<CandidateMatch | null>(
     null,
   );
+  const [session, setSession] = useState<Session | null>(null);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [isRoomLoading, setIsRoomLoading] = useState(false);
 
   const [confirmationChoice, setConfirmationChoice] = useState<
     "accepted" | "declined" | null
   >(null);
 
+  function connectMatchingSocket(mountedRef?: { current: boolean }) {
+    if (socketRef.current?.connected) return;
+
+    const socket = io(MATCHING_SERVER_URL, {
+      transports: ["websocket"],
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      if (mountedRef && !mountedRef.current) return;
+      setIsConnected(true);
+      setState("idle");
+      setMessage("");
+      console.log("Connected to matching service:", socket.id);
+    });
+
+    socket.on("disconnect", (reason) => {
+      if (mountedRef && !mountedRef.current) return;
+      setIsConnected(false);
+      console.log("Disconnected from matching service:", reason);
+      setMessage("Disconnected from matching service.");
+    });
+
+    socket.on("connect_error", (error) => {
+      if (mountedRef && !mountedRef.current) return;
+      console.error("Socket connection error:", error);
+      setIsConnected(false);
+      setState("error");
+      setMessage(error.message || "Failed to connect to matching service.");
+    });
+
+    socket.on("match_response", (payload: MatchResponsePayload) => {
+      if (mountedRef && !mountedRef.current) return;
+
+      console.log("MATCH_RESPONSE:", payload);
+
+      setMessage(payload.message || "");
+      setCountdown(
+        typeof payload.timeoutSeconds === "number"
+          ? payload.timeoutSeconds
+          : null,
+      );
+
+      switch (payload.status) {
+        case "queued":
+          setState("waiting");
+          setProposedMatch(null);
+          setSessionId("");
+          break;
+
+        case "imperfect_match_needs_confirmation":
+          setState("confirming");
+          setProposedMatch(payload.proposedMatch || null);
+          setConfirmationChoice(null);
+          break;
+
+        case "perfect_match_found":
+          setProposedMatch(null);
+          setConfirmationChoice(null);
+          if (payload.sessionId) {
+            void loadSessionRoom(payload.sessionId);
+          } else {
+            setState("error");
+            setMessage("Match found but no session ID was returned.");
+          }
+          break;
+
+        case "match_success":
+          setProposedMatch(null);
+          setConfirmationChoice(null);
+          if (payload.sessionId) {
+            void loadSessionRoom(payload.sessionId);
+          } else {
+            setState("error");
+            setMessage("Match succeeded but no session ID was returned.");
+          }
+          break;
+
+        case "match_timeout":
+          setState("error");
+          setProposedMatch(null);
+          setSessionId("");
+          break;
+
+        case "unsuccessful_match":
+          setProposedMatch(null);
+          setSessionId("");
+
+          if (
+            (payload.message || "").toLowerCase().includes("temporarily banned")
+          ) {
+            setState("banned");
+          } else {
+            setState("error");
+          }
+          break;
+
+        case "cancelled":
+          resetMatchState("idle");
+          setMessage(payload.message || "Matching cancelled.");
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    socket.on("cancel_response", (payload: MatchResponsePayload) => {
+      if (mountedRef && !mountedRef.current) return;
+
+      console.log("CANCEL_RESPONSE:", payload);
+      setMessage(payload.message || "");
+
+      switch (payload.status) {
+        case "cancelled":
+          resetMatchState("idle");
+          setMessage(payload.message || "Matching cancelled.");
+          break;
+
+        case "imperfect_match_needs_confirmation":
+          setState("confirming");
+          break;
+
+        case "unsuccessful_match":
+          setState((prev) => prev);
+          break;
+
+        default:
+          break;
+      }
+    });
+  }
+
   useEffect(() => {
-    let mounted = true;
+    const mountedRef = { current: true };
 
     async function setupUserAndSocket() {
       try {
         const user = await getUserInfo();
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setUserId(user.id);
+        setUsername(user.username);
+        try {
+          const activeSession = await getActiveSession();
+          if (!mountedRef.current) return;
+
+          console.log("ACTIVE SESSION:", activeSession);
+
+          if (activeSession?.session_id) {
+            await loadSessionRoom(activeSession.session_id);
+            return;
+          }
+        } catch {
+        }
       } catch (error) {
         console.error("Failed to load user info:", error);
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setState("error");
         setMessage("Failed to load user info.");
         return;
       }
 
-      const socket = io(MATCHING_SERVER_URL, {
-        transports: ["websocket"],
-      });
-
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        if (!mounted) return;
-        setIsConnected(true);
-        setState("idle");
-        setMessage("");
-        console.log("Connected to matching service:", socket.id);
-      });
-
-      socket.on("disconnect", (reason) => {
-        if (!mounted) return;
-        setIsConnected(false);
-        console.log("Disconnected from matching service:", reason);
-
-        if (state !== "active") {
-          setMessage("Disconnected from matching service.");
-        }
-      });
-
-      socket.on("connect_error", (error) => {
-        console.error("Socket connection error:", error);
-        if (!mounted) return;
-        setIsConnected(false);
-        setState("error");
-        setMessage(error.message || "Failed to connect to matching service.");
-      });
-
-      socket.on("match_response", (payload: MatchResponsePayload) => {
-        console.log("MATCH_RESPONSE:", payload);
-
-        setMessage(payload.message || "");
-        setCountdown(
-          typeof payload.timeoutSeconds === "number"
-            ? payload.timeoutSeconds
-            : null,
-        );
-
-        switch (payload.status) {
-          case "queued":
-            setState("waiting");
-            setProposedMatch(null);
-            setSessionId("");
-            break;
-
-          case "imperfect_match_needs_confirmation":
-            setState("confirming");
-            setProposedMatch(payload.proposedMatch || null);
-            setConfirmationChoice(null);
-            break;
-
-          case "perfect_match_found":
-            if (payload.sessionId) {
-              setSessionId(payload.sessionId);
-            }
-            setProposedMatch(null);
-            setConfirmationChoice(null);
-            setState("active");
-            break;
-
-          case "match_success":
-            setProposedMatch(null);
-            setConfirmationChoice(null);
-            if (payload.sessionId) {
-              setSessionId(payload.sessionId);
-            }
-            setState("active");
-            break;
-
-          case "match_timeout":
-            setState("error");
-            setProposedMatch(null);
-            setSessionId("");
-            break;
-
-          case "unsuccessful_match":
-            setProposedMatch(null);
-            setSessionId("");
-
-            if (
-              (payload.message || "")
-                .toLowerCase()
-                .includes("temporarily banned")
-            ) {
-              setState("banned");
-            } else {
-              setState("error");
-            }
-            break;
-
-          case "cancelled":
-            resetMatchState("idle");
-            setMessage(payload.message || "Matching cancelled.");
-            break;
-
-          default:
-            break;
-        }
-      });
-
-      socket.on("cancel_response", (payload: MatchResponsePayload) => {
-        console.log("CANCEL_RESPONSE:", payload);
-        setMessage(payload.message || "");
-
-        switch (payload.status) {
-          case "cancelled":
-            resetMatchState("idle");
-            setMessage(payload.message || "Matching cancelled.");
-            break;
-
-          case "imperfect_match_needs_confirmation":
-            setState("confirming");
-            break;
-
-          case "unsuccessful_match":
-            // Do not force idle, because backend may be telling us
-            // the user was not queued / cancel was invalid
-            setState((prev) => prev);
-            break;
-
-          default:
-            break;
-        }
-      });
+      connectMatchingSocket(mountedRef);
     }
 
     void setupUserAndSocket();
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       socketRef.current?.disconnect();
       socketRef.current = null;
-    };
+};
   }, []);
 
   useEffect(() => {
@@ -289,19 +313,49 @@ export default function CollabPage() {
     setConfirmationChoice(null);
   }
 
-  function handleEnterRoom() {
-    // later can navigate to /collab/:sessionId if route is changed
-    console.log("Entering room with sessionId:", sessionId);
-    setState("active");
-  }
-
   function handleLeaveSession() {
     setState("idle");
     setSessionId("");
+    setSession(null);
+    setQuestion(null);
     setProposedMatch(null);
     setMessage("");
     setCountdown(null);
     setConfirmationChoice(null);
+
+    if (!socketRef.current || !socketRef.current.connected) {
+      connectMatchingSocket();
+    } else {
+      setIsConnected(true);
+    }
+  }
+
+  async function loadSessionRoom(targetSessionId: string) {
+    try {
+      setIsRoomLoading(true);
+      setMessage("Loading collaboration room...");
+      console.log("Loading session room for:", targetSessionId);
+      const sessionData = await getSession(targetSessionId);
+      console.log("SESSION DATA:", sessionData);
+      const questionData = await getQuestionById(sessionData.question_id);
+      console.log("QUESTION DATA:", questionData);
+      setSession(sessionData);
+      setQuestion(questionData);
+      setSessionId(targetSessionId);
+      setState("active");
+      setMessage("");
+      console.log("Loading session room for:", targetSessionId);
+    } catch (error) {
+      console.error("Failed to load collaboration room:", error);
+      setState("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load collaboration session.",
+      );
+    } finally {
+      setIsRoomLoading(false);
+    }
   }
 
   if (state === "connecting") {
@@ -501,34 +555,29 @@ export default function CollabPage() {
   }
 
   if (state === "active") {
+    if (isRoomLoading || !session || !question) {
+      return (
+        <div className="max-w-xl">
+          <h1 className="text-2xl font-bold mb-6">
+            Loading Collaboration Room
+          </h1>
+          <div className="bg-white p-6 rounded-xl shadow-sm">
+            <p className="text-slate-600">
+              {message || "Loading session and question..."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="grid grid-cols-2 gap-6 h-[80vh]">
-        <div className="bg-white rounded-xl shadow-sm p-6 overflow-auto">
-          <h2 className="text-lg font-semibold mb-3">Question</h2>
-
-          <p className="text-slate-600 font-medium">Question placeholder</p>
-
-          <p className="mt-3 text-sm text-slate-600">
-            Session ID: {sessionId || "Not available yet"}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col">
-          <h2 className="text-lg font-semibold mb-3">Code Editor</h2>
-
-          <textarea
-            className="flex-1 border rounded-lg p-3 font-mono text-sm"
-            placeholder="Write your solution here..."
-          />
-
-          <button
-            onClick={handleLeaveSession}
-            className="mt-4 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
-          >
-            Leave Session
-          </button>
-        </div>
-      </div>
+      <CollaborationRoom
+        session={session}
+        question={question}
+        userId={userId}
+        username={username}
+        onLeave={handleLeaveSession}
+      />
     );
   }
 
