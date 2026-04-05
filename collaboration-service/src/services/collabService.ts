@@ -27,7 +27,7 @@ export const initCollabService = (httpServer: HttpServer) => {
     console.log(`Socket connected: ${socket.id}`);
 
     // user joins a collaboration room
-    socket.on('join-session', async ({ sessionId, userId }) => {
+    socket.on('join-session', async ({ sessionId, userId, username }) => {
       try {
         const session = await sessionService.getSessionById(sessionId);
         if (!session) {
@@ -53,6 +53,13 @@ export const initCollabService = (httpServer: HttpServer) => {
         socket.data.sessionId = sessionId;
         socket.data.userId = userId;
 
+        const room = io.sockets.adapter.rooms.get(sessionId);
+        const participantCount = room ? room.size : 0;
+
+        if (participantCount > 1) {
+          socket.emit("partner-already-present");
+        }
+
         // restore latest code state from Redis (F11.2.3)
         const savedCode = await redisClient.get(`session:${sessionId}:code`);
         if (savedCode) {
@@ -65,7 +72,7 @@ export const initCollabService = (httpServer: HttpServer) => {
         }
 
         // notify partner that user has joined
-        socket.to(sessionId).emit('user-joined', { userId });
+        socket.to(sessionId).emit('user-joined', { username });
 
         // start idle timer
         resetIdleTimer(io, sessionId);
@@ -177,6 +184,11 @@ export const initCollabService = (httpServer: HttpServer) => {
           message: 'Your partner ended the session early. You can rejoin the queue immediately.',
         });
       }
+
+      socket.emit("session-ended", {
+        message: "You ended the session.",
+        endedBy: userId,
+      });
 
       // notify partner session has ended (F11.5.1)
       socket.to(sessionId).emit('session-ended', {

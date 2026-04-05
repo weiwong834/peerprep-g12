@@ -62,12 +62,14 @@ export const getSessionById = async (sessionId: string): Promise<Session | null>
 
 export const getActiveSessionByUserId = async (userId: string): Promise<Session | null> => {
   const { data, error } = await supabase
-    .schema('collaborationservice')
-    .from('collaboration_rooms')
-    .select('*')
+    .schema("collaborationservice")
+    .from("collaboration_rooms")
+    .select("*")
     .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-    .eq('status', 'active')
-    .single();
+    .eq("status", "active")
+    .order("start_timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (error) return null;
   return data as Session;
