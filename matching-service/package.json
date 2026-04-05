@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "npx tsx src/index.ts",
+    "start": "npx tsx src/index.ts",
     "dev:frontend": "npx http-server ./frontend -p 5173 -c-1",
     "test": "npx tsx test-client.ts",
     "test:concurrent-score": "npx tsx test-concurrent-score.ts"

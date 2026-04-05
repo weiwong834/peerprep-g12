@@ -12,7 +12,7 @@ services:
       - matching-service
       - user-service
       - question-service
-      - collab-service
+      - collaboration-service
 
   user-service:
     build: ./user-service
@@ -23,17 +23,50 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
 
+  question-service:
+    build: ./question-service
+    ports: 
+      - "3001:3001"
+    env_file:
+      - ./question-service/.env
+    environment: 
+      - PORT=3001
+      - USER_SERVICE_URL=http://user-service:3000
+    depends_on:
+      - user-service
+
   matching-service:
     build: ./matching-service
     ports:
       - "3002:3002"
     env_file:
-    - ./matching-service/.env.docker
+      - ./matching-service/.env.docker
+    environment:
+      - USER_SERVICE_URL=http://user-service:3000
+      - QUESTION_SERVICE_URL=http://question-service:3001
+      - COLLABORATION_SERVICE_URL=http://collaboration-service:3003
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - redis
       - user-service
       - question-service
       - collaboration-service
+
+
+  collaboration-service:
+    build: ./collaboration-service
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./collaboration-service/.env
+    environment:
+      - PORT=3003
+      - QUESTION_SERVICE_URL=http://question-service:3001
+      - MATCHING_SERVICE_URL=http://matching-service:3002
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - question-service
 
   redis:
     image: redis:alpine
