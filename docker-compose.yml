@@ -23,18 +23,6 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
 
-  question-service:
-    build: ./question-service
-    ports: 
-      - "3001:3001"
-    env_file:
-      - ./question-service/.env
-    environment: 
-      - PORT=3001
-      - USER_SERVICE_URL=http://user-service:3000
-    depends_on:
-      - user-service
-
   matching-service:
     build: ./matching-service
     ports:
