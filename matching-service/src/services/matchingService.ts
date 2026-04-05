@@ -40,6 +40,8 @@ export type EarlyTerminationDecision = {
 	strikeCount?: number;
 };
 
+type ActiveSessionCheckOutcome = 'active' | 'inactive' | 'error';
+
 export class MatchingService {
 	private activeContextsByUserId = new Map<string, ActiveMatchContext>();
 	private readonly logger = createLogger('MatchingService');
@@ -62,6 +64,29 @@ export class MatchingService {
 				status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
 				flowStatus: ActionFlowStatus.TERMINATED,
 				message: 'You are temporarily banned from matching.'
+			});
+			return;
+		}
+
+		// Check with collaboration service if user has existing active session before allowing match request
+		const activeSessionOutcome = await this.checkActiveSessionByUserIdInternal(userId);
+		if (activeSessionOutcome === 'active') {
+			this.logger.warn('Rejected match request: user is already in an active collaboration session', {
+				userId
+			});
+			socket.emit(WebSocketEventType.MATCH_RESPONSE, {
+				status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: 'You are already in an active collaboration session.'
+			});
+			return;
+		}
+
+		if (activeSessionOutcome === 'error') {
+			socket.emit(WebSocketEventType.MATCH_RESPONSE, {
+				status: MatchResponseStatus.UNSUCCESSFUL_MATCH,
+				flowStatus: ActionFlowStatus.TERMINATED,
+				message: 'Unable to verify active session status due to an internal error. Please try again.'
 			});
 			return;
 		}
@@ -157,6 +182,49 @@ export class MatchingService {
 		});
 
 		await this.startImperfectMatchConfirmation(candidate);
+	}
+
+	private async checkActiveSessionByUserIdInternal(userId: string): Promise<ActiveSessionCheckOutcome> {
+		const apiKey = process.env.INTERNAL_SERVICE_SECRET;
+		if (!apiKey) {
+			this.logger.error('INTERNAL_SERVICE_SECRET is not set in matching service environment');
+			return 'error';
+		}
+
+		try {
+			const response = await fetch(
+				`${this.collaborationServiceBaseUrl}/sessions/internal/active/${encodeURIComponent(userId)}`,
+				{
+					method: 'GET',
+					headers: {
+						'x-internal-service-secret': apiKey
+					}
+				}
+			);
+
+			if (response.status === 200) {
+				return 'active';
+			}
+
+			if (response.status === 404) {
+				const body = (await response.json().catch(() => null)) as { error?: string } | null;
+				if (body?.error === 'No active session found') {
+					return 'inactive';
+				}
+			}
+
+			this.logger.error('Unexpected response while checking for active collaboration session', {
+				userId,
+				status: response.status
+			});
+			return 'error';
+		} catch (error) {
+			this.logger.error('Failed to call collaboration service active session endpoint', {
+				userId,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return 'error';
+		}
 	}
 
 	async handleCancelRequest(socket: Socket, payload: CancelRequestPayload): Promise<void> {
