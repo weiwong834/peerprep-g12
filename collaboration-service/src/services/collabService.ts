@@ -112,6 +112,8 @@ export const initCollabService = (httpServer: HttpServer) => {
         return;
       }
       await redisClient.set(`session:${sessionId}:code`, code);
+
+      console.log("REDIS save complete", { sessionId });
     });
 
     // user ends session (F11.5)
@@ -302,7 +304,6 @@ const clearIdleTimers = (sessionId: string) => {
   const warningTimer = idleWarningTimers.get(sessionId);
   if (timer) { clearTimeout(timer); idleTimers.delete(sessionId); }
   if (warningTimer) { clearTimeout(warningTimer); idleWarningTimers.delete(sessionId); }
-  stopCodeSaveInterval(sessionId);
 };
 
 const startCodeSaveInterval = (sessionId: string) => {
@@ -314,6 +315,7 @@ const startCodeSaveInterval = (sessionId: string) => {
   const interval = setInterval(async () => {
   try {
     const code = await redisClient.get(`session:${sessionId}:code`);
+    console.log("INTERVAL READ REDIS", { sessionId, code });
     if (code) {
       await sessionService.updateSession(sessionId, { code_content: code });
       console.log(`Code saved to Supabase for session ${sessionId}`);

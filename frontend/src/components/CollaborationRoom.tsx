@@ -26,6 +26,9 @@ export default function CollaborationRoom({
 
   const ydocRef = useRef<Y.Doc | null>(null);
   const ytextRef = useRef<Y.Text | null>(null);
+  const pendingRestoredCodeRef = useRef<string | null>(null);
+  const initialSyncResolvedRef = useRef(false);
+  const syncFallbackTimeoutRef = useRef<number | null>(null);
 
   const [code, setCode] = useState("");
   const [roomMessage, setRoomMessage] = useState("");
@@ -54,8 +57,13 @@ export default function CollaborationRoom({
     ytext.observe(handleYTextChange);
 
     const handleYDocUpdate = (update: Uint8Array, origin: unknown) => {
-      // Do not re-broadcast updates that came from remote peer
-      if (origin === "remote" || origin === "restore") return;
+      if (
+        origin === "remote" ||
+        origin === "restore" ||
+        origin === "reset-before-sync"
+      ) {
+        return;
+      }
 
       const socketInstance = socketRef.current;
       if (!socketInstance) return;
@@ -65,6 +73,11 @@ export default function CollaborationRoom({
         update: Array.from(update),
       });
 
+      console.log("EMIT save-code", {
+        sessionId: session.session_id,
+        code: ytext.toString(),
+      });
+      
       socketInstance.emit("save-code", {
         sessionId: session.session_id,
         code: ytext.toString(),
@@ -85,6 +98,28 @@ export default function CollaborationRoom({
 
     socket.on("session-joined", () => {
       setRoomMessage("Joined collaboration room.");
+
+      initialSyncResolvedRef.current = false;
+
+      socket.emit("request-sync", {
+        sessionId: session.session_id,
+      });
+
+      syncFallbackTimeoutRef.current = window.setTimeout(() => {
+        if (initialSyncResolvedRef.current) return;
+
+        const pendingCode = pendingRestoredCodeRef.current;
+        if (!pendingCode) return;
+        if (ytext.length > 0) return;
+
+        ydoc.transact(() => {
+          ytext.insert(0, pendingCode);
+        }, "restore");
+
+        pendingRestoredCodeRef.current = null;
+        initialSyncResolvedRef.current = true;
+        syncFallbackTimeoutRef.current = null;
+      }, 500);
     });
 
     socket.on("partner-already-present", () => {
@@ -94,13 +129,40 @@ export default function CollaborationRoom({
     });
 
     socket.on("code-restored", ({ code }: { code: string }) => {
-      // Use restored plain text only if current Yjs doc is still empty
       if (!code) return;
-      if (ytext.length > 0) return;
+      pendingRestoredCodeRef.current = code;
+    });
 
-      ydoc.transact(() => {
-        ytext.insert(0, code);
-      }, "restore");
+    socket.on(
+      "sync-requested",
+      ({ fromSocketId }: { fromSocketId: string }) => {
+        const fullState = Y.encodeStateAsUpdate(ydoc);
+
+        socket.emit("sync-response", {
+          sessionId: session.session_id,
+          targetSocketId: fromSocketId,
+          update: Array.from(fullState),
+        });
+      },
+    );
+
+    socket.on("sync-response", ({ update }: { update: number[] }) => {
+      if (syncFallbackTimeoutRef.current !== null) {
+        clearTimeout(syncFallbackTimeoutRef.current);
+        syncFallbackTimeoutRef.current = null;
+      }
+
+      const currentText = ytext.toString();
+      if (currentText.length > 0) {
+        ydoc.transact(() => {
+          ytext.delete(0, currentText.length);
+        }, "reset-before-sync");
+      }
+
+      const incoming = new Uint8Array(update);
+      Y.applyUpdate(ydoc, incoming, "remote");
+      pendingRestoredCodeRef.current = null;
+      initialSyncResolvedRef.current = true;
     });
 
     socket.on("user-joined", ({ username }: { username: string }) => {
@@ -149,6 +211,14 @@ export default function CollaborationRoom({
     });
 
     return () => {
+      if (syncFallbackTimeoutRef.current !== null) {
+        clearTimeout(syncFallbackTimeoutRef.current);
+        syncFallbackTimeoutRef.current = null;
+      }
+
+      pendingRestoredCodeRef.current = null;
+      initialSyncResolvedRef.current = false;
+
       ytext.unobserve(handleYTextChange);
       ydoc.off("update", handleYDocUpdate);
       ydoc.destroy();
