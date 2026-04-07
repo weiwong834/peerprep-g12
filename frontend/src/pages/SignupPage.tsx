@@ -83,6 +83,10 @@ export default function SignupPage() {
     setUsernameAvailable(null);
   }, [email]);
 
+  useEffect(() => {
+    setUsernameSubmitError("");
+  }, [username]);
+
   // ---------------- LIVE USERNAME CHECK ----------------
   useEffect(() => {
     let cancelled = false;

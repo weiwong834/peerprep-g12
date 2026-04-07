@@ -115,12 +115,23 @@ export async function logoutUser() {
 }
 
 export async function checkUniqueUsername(username: string) {
-  return authFetch<{ available: boolean }>(
+  const response = await fetch(
     `${API_BASE}/user/checkUniqueUsername?username=${encodeURIComponent(username)}`,
     {
       method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
   );
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || "Failed to check username");
+  }
+
+  return data as { available: boolean };
 }
 
 export async function requestResetPassword(email: string) {

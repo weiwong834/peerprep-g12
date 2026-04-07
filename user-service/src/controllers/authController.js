@@ -550,7 +550,7 @@ export const checkUniqueUsername = async (req, res) => {
     });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .schema("userservice")
     .from("profiles")
     .select("id")
