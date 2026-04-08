@@ -1,0 +1,26 @@
+import amqp from 'amqplib';
+
+let channel: amqp.Channel | null = null;
+
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+export const EXCHANGE_NAME = 'session.events';
+export const SESSION_ENDED_ROUTING_KEY = 'session.ended';
+
+export async function connectRabbitMQ(): Promise<amqp.Channel> {
+  const connection = await amqp.connect(RABBITMQ_URL);
+  channel = await connection.createChannel();
+
+  await channel.assertExchange(EXCHANGE_NAME, 'topic', { durable: true });
+
+  console.log('Chat Service: RabbitMQ connected');
+  return channel;
+}
+
+export function getChannel(): amqp.Channel {
+  if (!channel) throw new Error('RabbitMQ channel not initialised');
+  return channel;
+}
+
+export async function closeRabbitMQ(): Promise<void> {
+  await channel?.close();
+}

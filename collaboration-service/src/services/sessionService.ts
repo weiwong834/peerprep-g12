@@ -1,6 +1,7 @@
 import supabase from '../config/supabase';
 import { Session, CreateSessionDTO, UpdateSessionDTO } from '../models/session';
 import { randomUUID } from 'crypto';
+import { getChannel, EXCHANGE_NAME, SESSION_ENDED_ROUTING_KEY } from '../config/rabbitmq';
 
 const fetchQuestionFromService = async (topic: string, difficulty: string): Promise<string> => {
   const questionServiceUrl = process.env.QUESTION_SERVICE_URL || 'http://localhost:3001';
@@ -99,8 +100,25 @@ export const updateSession = async (
 };
 
 export const endSession = async (sessionId: string): Promise<Session> => {
-  return updateSession(sessionId, {
+  const session = await updateSession(sessionId, {
     status: 'inactive',
     end_timestamp: new Date(),
   });
+
+  // publish session.ended event for chat service to persist chat history
+  try {
+    const channel = getChannel();
+    channel.publish(
+      EXCHANGE_NAME,
+      SESSION_ENDED_ROUTING_KEY,
+      Buffer.from(JSON.stringify({ session_id: sessionId })),
+      { persistent: true }
+    );
+    console.log(`Published session.ended for session ${sessionId}`);
+  } catch (err) {
+    // chat persistence failing shouldn't break session ending
+    console.error('Failed to publish session.ended event:', err);
+  }
+
+  return session;
 };

@@ -1,0 +1,20 @@
+import Redis from 'ioredis';
+
+let redisClient: Redis;
+
+export async function connectRedis(): Promise<void> {
+  redisClient = new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+  });
+
+  redisClient.on('connect', () => console.log('Chat Service: Redis connected'));
+  redisClient.on('error', (err) => console.error('Chat Service: Redis error', err));
+}
+
+export function getRedisClient(): Redis {
+  if (!redisClient) throw new Error('Redis not initialised');
+  return redisClient;
+}
+
+export default redisClient!;

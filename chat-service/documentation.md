@@ -1,0 +1,98 @@
+## Chat Service Documentation
+
+### Prerequisites
+- Node.js 18+
+- Redis
+- RabbitMQ
+- Supabase project with `chatservice` schema
+
+### Environment Variables
+```env
+PORT=3004
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+RABBITMQ_URL=amqp://localhost:5672
+REDIS_HOST=localhost
+REDIS_PORT=6379
+USER_SERVICE_URL=http://localhost:3000
+COLLAB_SERVICE_URL=http://localhost:3003
+INTERNAL_SERVICE_SECRET=
+```
+
+### Running Locally
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Socket.io Events
+
+### Client → Server
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `authenticate` | `token: string` | Authenticate via JWT. Validates token with User Service and checks for active session with Collab Service. |
+| `send-message` | `content: string` | Send a chat message. User must be authenticated first. |
+
+### Server → Client
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `authenticated` | `{ sessionId }` | Emitted on successful authentication. |
+| `auth-error` | `{ message }` | Emitted if authentication fails. |
+| `receive-message` | `ChatMessage` | Broadcast to both users in the session room when a message is sent. |
+| `chat-history` | `ChatMessage[]` | Emitted on join with existing messages from Redis. |
+| `error` | `{ message }` | Emitted on invalid message or unauthenticated action. |
+
+### ChatMessage Schema
+```typescript
+{
+  session_id: string;
+  sender_id: string;
+  content: string;
+  timestamp: string;
+}
+```
+
+---
+
+## REST Endpoints
+
+### GET /chat/:sessionId/history
+Retrieve chat history for a session. Checks Redis first (active session), falls back to Supabase (ended session). Requires authentication.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "messages": [ ChatMessage ],
+  "source": "redis" | "supabase"
+}
+```
+
+---
+
+## External Endpoints Called
+
+| Service | Endpoint | Purpose |
+|---------|----------|---------|
+| User Service | `GET /user/getUserInfo` | Verify JWT and retrieve user ID |
+| Collab Service | `GET /sessions/internal/active/:userId` | Verify user has an active session |
+
+## Calls made to this service
+
+| Caller | Method | Endpoint | Purpose |
+|--------|--------|----------|---------|
+| Frontend | GET | `/chat/:sessionId/history` | Get chat history for a session |
+
+---
+
+## RabbitMQ
+
+- **Exchange:** `session.events` (topic, durable)
+- **Routing key consumed:** `session.ended`
+- **Queue:** `chat.session.ended` (durable)
+- **Behaviour:** On receiving `session.ended`, flushes Redis messages to Supabase and clears the Redis key.
+
+---

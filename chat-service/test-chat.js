@@ -1,0 +1,32 @@
+const { io } = require('socket.io-client');
+
+const TOKEN = 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwZWQ0OTI3LTEwY2YtNDAzZS05NDY1LWM4MGNjNmZiNzkwMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3lyanJ5bXFsZnhhamV1emhicGVnLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhOTI2MTYzOS1hZDExLTQ1ZDktOGFjMS01ZjM4NzNmODNhY2YiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzc1NjU0NzY3LCJpYXQiOjE3NzU2NTExNjcsImVtYWlsIjoidXNlcjFAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbCI6InVzZXIxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaG9uZV92ZXJpZmllZCI6ZmFsc2UsInN1YiI6ImE5MjYxNjM5LWFkMTEtNDVkOS04YWMxLTVmMzg3M2Y4M2FjZiIsInVzZXJuYW1lIjoidXNlcjEifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc3NTY1MTE2N31dLCJzZXNzaW9uX2lkIjoiNDJiNGJmMGItMmI3OS00MWIxLThjNWEtY2Q2MmE5MGEwODEwIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.IU1cbt2XbcOcBxeTp-8gRN5IC1pEzCDhD7rz3QfnkpLOOyHITYXhaQ2_UhdmiFJjWtOlKjT_yT2JCl62R_Vtuw';
+
+const socket = io('http://localhost:3004');
+
+socket.on('connect', () => {
+  console.log('Connected:', socket.id);
+  socket.emit('authenticate', TOKEN);
+});
+
+socket.on('authenticated', (data) => {
+  console.log('Authenticated, session:', data.sessionId);
+  // Send a test message
+  socket.emit('send-message', 'Hello from test!');
+});
+
+socket.on('receive-message', (msg) => {
+  console.log('Received message:', msg);
+});
+
+socket.on('chat-history', (messages) => {
+  console.log('Chat history:', messages);
+});
+
+socket.on('auth-error', (err) => {
+  console.error('Auth error:', err);
+});
+
+socket.on('error', (err) => {
+  console.error('Error:', err);
+});
