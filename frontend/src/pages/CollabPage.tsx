@@ -81,8 +81,20 @@ export default function CollabPage() {
   function connectMatchingSocket(mountedRef?: { current: boolean }) {
     if (socketRef.current?.connected) return;
 
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      if (mountedRef && !mountedRef.current) return;
+      setIsConnected(false);
+      setState("error");
+      setMessage("Missing authentication token. Please log in again.");
+      return;
+    }
+
     const socket = io(MATCHING_SERVER_URL, {
       transports: ["websocket"],
+      auth: {
+        token,
+      },
     });
 
     socketRef.current = socket;
