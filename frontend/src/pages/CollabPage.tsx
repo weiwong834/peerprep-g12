@@ -54,6 +54,7 @@ const MATCHING_SERVER_URL =
 
 export default function CollabPage() {
   const socketRef = useRef<Socket | null>(null);
+  const suppressNextDisconnectMessageRef = useRef(false);
 
   const [state, setState] = useState<CollabState>("connecting");
   const [isConnected, setIsConnected] = useState(false);
@@ -77,12 +78,35 @@ export default function CollabPage() {
   const [confirmationChoice, setConfirmationChoice] = useState<
     "accepted" | "declined" | null
   >(null);
+  // Avoid manual socket disconnect triggering notif to user
+  function disconnectMatchingSocket(suppressDisconnectMessage = false) {
+    if (!socketRef.current) return;
+    if (suppressDisconnectMessage) {
+      suppressNextDisconnectMessageRef.current = true;
+    }
+
+    socketRef.current.disconnect();
+    socketRef.current = null;
+    setIsConnected(false);
+  }
 
   function connectMatchingSocket(mountedRef?: { current: boolean }) {
     if (socketRef.current?.connected) return;
 
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      if (mountedRef && !mountedRef.current) return;
+      setIsConnected(false);
+      setState("error");
+      setMessage("Missing authentication token. Please log in again.");
+      return;
+    }
+
     const socket = io(MATCHING_SERVER_URL, {
       transports: ["websocket"],
+      auth: {
+        token,
+      },
     });
 
     socketRef.current = socket;
@@ -99,6 +123,12 @@ export default function CollabPage() {
       if (mountedRef && !mountedRef.current) return;
       setIsConnected(false);
       console.log("Disconnected from matching service:", reason);
+
+      if (suppressNextDisconnectMessageRef.current) {
+        suppressNextDisconnectMessageRef.current = false;
+        return;
+      }
+
       setMessage("Disconnected from matching service.");
     });
 
@@ -248,9 +278,8 @@ export default function CollabPage() {
 
     return () => {
       mountedRef.current = false;
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-};
+      disconnectMatchingSocket(true);
+    };
   }, []);
 
   useEffect(() => {
@@ -339,6 +368,10 @@ export default function CollabPage() {
       console.log("SESSION DATA:", sessionData);
       const questionData = await getQuestionById(sessionData.question_id);
       console.log("QUESTION DATA:", questionData);
+
+      // Once collaboration room opens, stop listening to matching events
+      disconnectMatchingSocket(true);
+
       setSession(sessionData);
       setQuestion(questionData);
       setSessionId(targetSessionId);

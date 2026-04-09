@@ -44,6 +44,7 @@ type ActiveSessionCheckOutcome = 'active' | 'inactive' | 'error';
 
 export class MatchingService {
 	private activeContextsByUserId = new Map<string, ActiveMatchContext>();
+	private activeUserIdBySocketId = new Map<string, string>();
 	private readonly logger = createLogger('MatchingService');
 
 	constructor(
@@ -268,7 +269,7 @@ export class MatchingService {
 			await this.redisService.clearPendingConfirmation(context.proposedImperfectMatch);
 		}
 
-		this.activeContextsByUserId.delete(userId);
+		this.clearUserContext(userId);
 		this.logger.info('Cancellation cleanup completed', { userId });
 		socket.emit(WebSocketEventType.CANCEL_RESPONSE, {
 			status: MatchResponseStatus.CANCELLED,
@@ -341,17 +342,13 @@ export class MatchingService {
 	async handleSocketDisconnect(socketId: string): Promise<void> {
 		this.logger.info('Socket disconnect received', { socketId });
 
-		// TBD: Once auth middleware setup, no need to scan through contexts, just identify user by socketId and get context by id
-		const disconnectedContext = Array.from(this.activeContextsByUserId.values()).find(
-			(context) => context.socketId === socketId
-		);
-
-		if (!disconnectedContext) {
-			this.logger.debug('No active matching context found for disconnected socket', { socketId });
+		// Identify disconnect user by socket id
+		const disconnectedUserId = this.activeUserIdBySocketId.get(socketId);
+		if (!disconnectedUserId) {
+			this.logger.info('No active matching context found for disconnected socket', { socketId });
 			return;
 		}
 
-		const disconnectedUserId = disconnectedContext.userId;
 		// Check if user was pending imperfect match confirmation
 		const pending = await this.redisService.getPendingConfirmationByUser(disconnectedUserId);
 
@@ -440,7 +437,15 @@ export class MatchingService {
 
     // Clears any old timers and sets new context for the user (gives them the most recent socket id)
 	private setOrResetContext(socketId: string, userId: string, queuedSince: number): void {
+		const mappedUserId = this.activeUserIdBySocketId.get(socketId);
+		if (mappedUserId && mappedUserId !== userId) {
+			this.clearUserContext(mappedUserId);
+		}
+
 		const current = this.activeContextsByUserId.get(userId);
+		if (current?.socketId && current.socketId !== socketId) {
+			this.activeUserIdBySocketId.delete(current.socketId);
+		}
 		if (current?.perfectMatchTimer) {
 			clearTimeout(current.perfectMatchTimer);
 		}
@@ -449,6 +454,7 @@ export class MatchingService {
 		}
 
 		this.activeContextsByUserId.set(userId, { socketId, userId, queuedSince });
+		this.activeUserIdBySocketId.set(socketId, userId);
 		this.logger.debug('Active context set or reset', { userId, socketId });
 	}
 
@@ -467,7 +473,7 @@ export class MatchingService {
 				flowStatus: ActionFlowStatus.TERMINATED,
 				message: 'No match found within 2 minutes.'
 			});
-			this.activeContextsByUserId.delete(userId);
+			this.clearUserContext(userId);
 			return 0;
 		}
 
@@ -484,7 +490,7 @@ export class MatchingService {
 					? 'No match found within 2 minutes.'
 					: 'No match found within 30 seconds.'
 			});
-			this.activeContextsByUserId.delete(userId);
+			this.clearUserContext(userId);
 		}, timeoutMs);
 
 		return Math.ceil(timeoutMs / 1000);
@@ -914,7 +920,11 @@ export class MatchingService {
 	}
 
 	private clearUserContext(userId: string): void {
+		const context = this.activeContextsByUserId.get(userId);
 		this.clearUserTimers(userId);
 		this.activeContextsByUserId.delete(userId);
+		if (context?.socketId) {
+			this.activeUserIdBySocketId.delete(context.socketId);
+		}
 	}
 }
