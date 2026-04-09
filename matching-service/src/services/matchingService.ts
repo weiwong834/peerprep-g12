@@ -45,7 +45,6 @@ type ActiveSessionCheckOutcome = 'active' | 'inactive' | 'error';
 export class MatchingService {
 	private activeContextsByUserId = new Map<string, ActiveMatchContext>();
 	private activeUserIdBySocketId = new Map<string, string>();
-	private activeUserIdBySocketId = new Map<string, string>();
 	private readonly logger = createLogger('MatchingService');
 
 	constructor(
@@ -271,7 +270,6 @@ export class MatchingService {
 		}
 
 		this.clearUserContext(userId);
-		this.clearUserContext(userId);
 		this.logger.info('Cancellation cleanup completed', { userId });
 		socket.emit(WebSocketEventType.CANCEL_RESPONSE, {
 			status: MatchResponseStatus.CANCELLED,
@@ -444,15 +442,7 @@ export class MatchingService {
 			this.clearUserContext(mappedUserId);
 		}
 
-		const mappedUserId = this.activeUserIdBySocketId.get(socketId);
-		if (mappedUserId && mappedUserId !== userId) {
-			this.clearUserContext(mappedUserId);
-		}
-
 		const current = this.activeContextsByUserId.get(userId);
-		if (current?.socketId && current.socketId !== socketId) {
-			this.activeUserIdBySocketId.delete(current.socketId);
-		}
 		if (current?.socketId && current.socketId !== socketId) {
 			this.activeUserIdBySocketId.delete(current.socketId);
 		}
@@ -464,7 +454,6 @@ export class MatchingService {
 		}
 
 		this.activeContextsByUserId.set(userId, { socketId, userId, queuedSince });
-		this.activeUserIdBySocketId.set(socketId, userId);
 		this.activeUserIdBySocketId.set(socketId, userId);
 		this.logger.debug('Active context set or reset', { userId, socketId });
 	}
@@ -485,7 +474,6 @@ export class MatchingService {
 				message: 'No match found within 2 minutes.'
 			});
 			this.clearUserContext(userId);
-			this.clearUserContext(userId);
 			return 0;
 		}
 
@@ -502,7 +490,6 @@ export class MatchingService {
 					? 'No match found within 2 minutes.'
 					: 'No match found within 30 seconds.'
 			});
-			this.clearUserContext(userId);
 			this.clearUserContext(userId);
 		}, timeoutMs);
 
@@ -934,12 +921,8 @@ export class MatchingService {
 
 	private clearUserContext(userId: string): void {
 		const context = this.activeContextsByUserId.get(userId);
-		const context = this.activeContextsByUserId.get(userId);
 		this.clearUserTimers(userId);
 		this.activeContextsByUserId.delete(userId);
-		if (context?.socketId) {
-			this.activeUserIdBySocketId.delete(context.socketId);
-		}
 		if (context?.socketId) {
 			this.activeUserIdBySocketId.delete(context.socketId);
 		}
