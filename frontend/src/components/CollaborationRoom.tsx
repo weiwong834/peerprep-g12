@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import * as Y from "yjs";
+import Editor from "@monaco-editor/react";
 import type { Session } from "../services/collaborationService";
 import type { Question } from "../services/questionService";
 
@@ -230,6 +231,19 @@ export default function CollaborationRoom({
     };
   }, [session.session_id, userId, username]);
 
+  function getEditorLanguage(language: string) {
+    switch (language.toLowerCase()) {
+      case "javascript":
+        return "javascript";
+      case "python":
+        return "python";
+      case "java":
+        return "java";
+      default:
+        return "plaintext";
+    }
+  }
+
   function handleCodeChange(nextValue: string) {
     const ydoc = ydocRef.current;
     const ytext = ytextRef.current;
@@ -266,7 +280,7 @@ export default function CollaborationRoom({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-6 h-[80vh]">
+    <div className="grid grid-cols-2 gap-6 h-[80vh] min-h-0">
       <div className="bg-white rounded-xl shadow-sm p-6 overflow-auto">
         <h2 className="text-lg font-semibold mb-3">{question.title}</h2>
 
@@ -321,7 +335,7 @@ export default function CollaborationRoom({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col">
+      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col min-h-0">
         <h2 className="text-lg font-semibold mb-3">Code Editor</h2>
 
         {roomMessage && (
@@ -352,13 +366,28 @@ export default function CollaborationRoom({
           </p>
         )}
 
-        <textarea
-          value={code}
-          onChange={(e) => handleCodeChange(e.target.value)}
-          disabled={!!sessionEndedMessage}
-          className="flex-1 border rounded-lg p-3 font-mono text-sm"
-          placeholder="Write your solution here..."
-        />
+        <div className="flex-1 border rounded-lg overflow-hidden">
+          <Editor
+            height="100%"
+            language={getEditorLanguage(session.language)}
+            value={code}
+            onChange={(value) => handleCodeChange(value ?? "")}
+            theme="vs-light"
+            options={{
+              readOnly: !!sessionEndedMessage,
+              minimap: { enabled: false },
+              fontSize: 14,
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              lineNumbers: "on",
+              tabSize: 2,
+              insertSpaces: true,
+              bracketPairColorization: { enabled: true },
+              padding: { top: 12 },
+            }}
+          />
+        </div>
 
         <div className="mt-4 flex gap-3">
           {!sessionEndedMessage ? (
