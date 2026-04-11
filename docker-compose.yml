@@ -8,11 +8,13 @@ services:
       - VITE_QUESTION_SERVICE_URL=http://localhost:3001
       - VITE_MATCHING_SERVICE_URL=http://localhost:3002
       - VITE_COLLAB_SERVICE_URL=http://localhost:3003
+      - VITE_AI_EXPLANATIONS_SERVICE_URL=http://localhost:4000
     depends_on:
       - matching-service
       - user-service
       - question-service
       - collaboration-service
+      - ai-explanations-service
 
   user-service:
     build: ./user-service
@@ -55,13 +57,19 @@ services:
       - REDIS_URL=redis://redis:6379
     depends_on:
       - redis
+      - rabbitmq
       - user-service
       - question-service
+    restart: always
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
       
   question-service:
     build: ./question-service
@@ -74,3 +82,13 @@ services:
       - USER_SERVICE_URL=http://user-service:3000
     depends_on:
       - user-service
+  
+  ai-explanations-service:
+    build: ./ai-explanations-service
+    ports:
+      - "4000:4000"
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - REDIS_HOST=redis
+    depends_on:
+      - redis

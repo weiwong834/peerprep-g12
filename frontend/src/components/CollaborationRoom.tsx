@@ -4,6 +4,8 @@ import * as Y from "yjs";
 import Editor from "@monaco-editor/react";
 import type { Session } from "../services/collaborationService";
 import type { Question } from "../services/questionService";
+import { getAiExplanation, getRemainingRequests } from "../services/aiExplanationsService";
+import type { AIExplanationType } from "../services/aiExplanationsService";
 
 const COLLAB_SERVER_URL =
   import.meta.env.VITE_COLLAB_SERVICE_URL || "http://localhost:3003";
@@ -39,6 +41,13 @@ export default function CollaborationRoom({
   const [sessionEndedMessage, setSessionEndedMessage] = useState("");
   const [earlyTerminationWarning, setEarlyTerminationWarning] = useState("");
   const [canRejoinQueue, setCanRejoinQueue] = useState(false);
+  const [aiResponse, setAIResponse] = useState("");
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  type TabType = "Partner Chat" | "AI Chat" | "AI Explanations";
+  const [activeTab, setActiveTab] = useState<TabType>("Partner Chat");
+
   useEffect(() => {
     const socket = io(COLLAB_SERVER_URL, {
       transports: ["websocket"],
@@ -237,6 +246,22 @@ export default function CollaborationRoom({
     };
   }, [session.session_id, userId, currentUsername]);
 
+  useEffect(() => {
+    async function fetchRemaining() {
+      try {
+        const data = await getRemainingRequests(
+          session.session_id,
+          userId
+        );
+        setRemainingRequests(data.remainingRequests);
+      } catch (err) {
+        console.error("Failed to fetch remaining requests", err);
+      }
+    }
+
+    fetchRemaining();
+  }, [session.session_id, userId]);
+
   function getEditorLanguage(language: string) {
     switch (language.toLowerCase()) {
       case "javascript":
@@ -285,8 +310,44 @@ export default function CollaborationRoom({
     });
   }
 
+  async function handleAIRequest(type: AIExplanationType) {
+  if (type === "EXPLAIN_CODE" && (!code || code.trim().length === 0)) {
+    setAIResponse("There is no code yet to explain.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const fullQuestion =
+      question.blocks?.length
+        ? question.blocks
+            .filter((block) => block.block_type === "text")
+            .map((block) => block.content)
+            .join("\n\n")
+        : question.title;
+
+    const data = await getAiExplanation(
+      type,
+      fullQuestion,
+      code,
+      session.session_id,
+      userId,
+    );
+
+    setAIResponse(data.response);
+    setRemainingRequests(data.remainingRequests);
+  } catch (err) {
+    console.log("Error fetching AI explanation:", err);
+    setAIResponse("Error fetching AI response.");
+    
+  } finally {
+    setLoading(false);
+  }
+}
+
   return (
-    <div className="grid grid-cols-2 gap-6 h-[80vh] min-h-0">
+    <div className="grid grid-cols-3 gap-6 h-[80vh] min-h-0">
       <div className="bg-white rounded-xl shadow-sm p-6 overflow-auto">
         <h2 className="text-lg font-semibold mb-3">{question.title}</h2>
 
@@ -430,6 +491,101 @@ export default function CollaborationRoom({
             </strong>
           </span>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col min-h-0">
+        <div className="flex border-b mb-3">
+          <button
+            onClick={() => setActiveTab("Partner Chat")}
+            className={`px-3 py-2 text-sm ${
+              activeTab === "Partner Chat"
+                ? "border-b-2 border-blue-500 font-medium"
+                : "text-gray-500"
+            }`}
+          >
+            Partner Chat
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AI Chat")}
+            className={`px-3 py-2 text-sm ${
+              activeTab === "AI Chat"
+                ? "border-b-2 border-blue-500 font-medium"
+                : "text-gray-500"
+            }`}
+          >
+            AI Chat
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AI Explanations")}
+            className={`px-3 py-2 text-sm ${
+              activeTab === "AI Explanations"
+                ? "border-b-2 border-blue-500 font-medium"
+                : "text-gray-500"
+            }`}
+          >
+            AI Explanations
+          </button>
+        </div>
+
+        {/* {activeTab === "Partner Chat" */} 
+
+        {/* {activeTab === "AI Chat" */}
+
+        {activeTab === "AI Explanations" && (
+          <>
+            <div className="text-sm text-gray-500 mb-2">
+              {remainingRequests !== null
+                ? `Hints left: ${remainingRequests} / 5`
+                : "Loading remaining hints..."}
+            </div>
+
+            <div className="flex flex-col gap-2 mb-4">
+              <button
+                onClick={() => handleAIRequest("EXPLAIN_QUESTION")}
+                disabled={loading || remainingRequests === 0 || remainingRequests === null}
+                className={`rounded px-3 py-2 text-sm ${
+                  loading || remainingRequests === 0 || remainingRequests === null
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-slate-100 hover:bg-slate-200"
+                }`}
+              >
+                Explain Question
+              </button>
+
+              <button
+                onClick={() => handleAIRequest("HINT")}
+                disabled={loading || remainingRequests === 0 || remainingRequests === null}
+                className={`rounded px-3 py-2 text-sm ${
+                  loading || remainingRequests === 0 || remainingRequests === null
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-slate-100 hover:bg-slate-200"
+                }`}
+              >
+                Give Hint
+              </button>
+
+              <button
+                onClick={() => handleAIRequest("EXPLAIN_CODE")}
+                disabled={loading || remainingRequests === 0 || remainingRequests === null}
+                className={`rounded px-3 py-2 text-sm ${
+                  loading || remainingRequests === 0 || remainingRequests === null
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-slate-100 hover:bg-slate-200"
+                }`}
+              >
+                Explain Code
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border rounded p-3 text-sm text-slate-700 whitespace-pre-wrap">
+              {loading
+                ? "Thinking..."
+                : aiResponse || "Ask for help to see AI explanation."}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
