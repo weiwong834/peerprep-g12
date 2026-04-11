@@ -3,6 +3,7 @@ import { createLogger } from "../utils/logger";
 import { generateAiResponse } from "../services/responseService";
 import { buildPrompt } from "../services/promptService";
 import { fetchSessionById } from "../services/collaborationService";
+import { parseQuestion } from "../services/questionService";
 
 const logger = createLogger("AiChatController");
 
@@ -70,15 +71,16 @@ export async function sendPrompt(req: Request, res: Response): Promise<void> {
 			return;
 		}
 
+		const cohesiveQuestion = await parseQuestion(session.question_id, authorization);
+
     // Send session info and user prompt to prompt service to craft the prompt
-		const craftedPrompt = await buildPrompt({
+		const craftedPrompt = buildPrompt({
 			language: session.language,
 			difficulty: session.difficulty,
 			topic: session.topic,
-			questionId: session.question_id,
+			cohesiveQuestion,
 			codeContent: session.code_content,
 			userPrompt: prompt,
-			authorization,
 		});
 
     // Send crafted prompt to response service to get AI response
