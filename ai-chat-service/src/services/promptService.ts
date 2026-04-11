@@ -8,6 +8,7 @@ type PromptContextInput = {
 	topic: string;
 	cohesiveQuestion: string;
 	codeContent: string;
+	chatHistory: string;
 	userPrompt: string;
 };
 
@@ -20,6 +21,7 @@ export function buildPrompt(input: PromptContextInput): string {
 		`Difficulty: ${input.difficulty}`,
 		`Topic: ${input.topic}`,
 		`Question: ${input.cohesiveQuestion}`,
+		`Chat history:\n${input.chatHistory}`,
 		`Current code: ${input.codeContent}`,
 		`User prompt: ${input.userPrompt}`,
 	].join("\n\n");
