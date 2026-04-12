@@ -78,7 +78,6 @@ export async function sendPrompt(req: Request, res: Response): Promise<void> {
     // Send session info and user prompt to prompt service to craft the prompt
 		const craftedPrompt = buildPrompt({
 			language: session.language,
-			difficulty: session.difficulty,
 			topic: session.topic,
 			cohesiveQuestion,
 			codeContent: session.code_content,
