@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 import { createLogger } from "./utils/logger";
+import { connectRedis } from "./config/redis";
 import aiChatRoutes from "./routes/aiChatRoutes";
 
 dotenv.config();
@@ -21,6 +22,20 @@ app.get("/", (_req: Request, res: Response) => {
   res.send('AI Chat Service is running');
 });
 
-httpServer.listen(PORT, '0.0.0.0', async () => {
-  logger.info(`AI Chat service listening on port ${PORT}`);
-});
+const start = async () => {
+  try {
+    await connectRedis();
+    logger.info('Redis connected successfully');
+
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      logger.info(`AI Chat service listening on port ${PORT}`);
+    });
+  } catch (err) {
+    logger.error('Failed to start server', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+    process.exit(1);
+  }
+};
+
+start();

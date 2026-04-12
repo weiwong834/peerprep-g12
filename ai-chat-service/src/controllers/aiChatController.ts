@@ -5,6 +5,7 @@ import { buildPrompt } from "../services/promptService";
 import { fetchSessionById } from "../services/collaborationService";
 import { parseQuestion } from "../services/questionService";
 import { getFormattedChatHistory } from "../services/chatHistoryService";
+import { checkAndIncrementPromptCount } from "../services/promptLimitService";
 
 const logger = createLogger("AiChatController");
 
@@ -69,6 +70,21 @@ export async function sendPrompt(req: Request, res: Response): Promise<void> {
 		if (session.user1_id !== userId && session.user2_id !== userId) {
 			logger.warn("User does not belong to session", { sessionId, userId });
 			res.status(403).json({ error: "Unauthorised access to session" });
+			return;
+		}
+    
+		// Check prompt limit
+		const promptLimitResult = await checkAndIncrementPromptCount(sessionId, userId);
+		if (!promptLimitResult.allowed) {
+			logger.warn("Prompt limit exceeded", {
+				sessionId,
+				userId,
+				count: promptLimitResult.count,
+				limit: promptLimitResult.limit,
+			});
+			res.status(429).json({
+				error: `Exceeded prompt limit of ${promptLimitResult.limit} for this session`,
+			});
 			return;
 		}
 
