@@ -8,3 +8,5 @@ matching-service/test-client.ts
 matching-service/test-concurrent-score.ts
 matching-service/.env.docker
 chat-service/package-lock.json
+chat-service/.env.docker
+collaboration-service/.env.docker

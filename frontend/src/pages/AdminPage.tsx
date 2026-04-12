@@ -11,6 +11,8 @@ import {
   type Question,
   type Topic,
 } from "../services/questionService";
+import { FiCheck, FiChevronDown } from "react-icons/fi";
+import { Listbox } from "@headlessui/react";
 import { getAllUsers, promoteUser } from "../services/userService";
 
 type AdminUser = {
@@ -18,6 +20,73 @@ type AdminUser = {
   username: string;
   isAdmin: boolean;
 };
+
+type DropdownOption = {
+  value: string;
+  label: string;
+};
+
+function CustomDropdown({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: DropdownOption[];
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const selectedOption =
+    options.find((option) => option.value === value) ?? null;
+
+  return (
+    <Listbox value={value} onChange={onChange} disabled={disabled}>
+      <div className="relative">
+        <Listbox.Button
+          className={`relative w-full rounded-xl border bg-white px-3 py-2.5 pr-10 text-left shadow-sm transition ${
+            disabled
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+              : "border-slate-300 text-slate-800 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+          }`}
+        >
+          <span className={selectedOption ? "" : "text-slate-400"}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-500">
+            <FiChevronDown className="h-5 w-5" />
+          </span>
+        </Listbox.Button>
+
+        <Listbox.Options className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg focus:outline-none">
+          {options.map((option) => (
+            <Listbox.Option
+              key={option.value}
+              value={option.value}
+              className={({ active }) =>
+                `relative cursor-pointer select-none px-4 py-2.5 ${
+                  active ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
+                }`
+              }
+            >
+              {({ selected }) => (
+                <div className="flex items-center justify-between">
+                  <span className={selected ? "font-medium" : "font-normal"}>
+                    {option.label}
+                  </span>
+                  {selected && <FiCheck className="h-4 w-4 text-indigo-600" />}
+                </div>
+              )}
+            </Listbox.Option>
+          ))}
+        </Listbox.Options>
+      </div>
+    </Listbox>
+  );
+}
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"questions" | "users">(
@@ -68,12 +137,51 @@ export default function AdminPage() {
   const [editMessage, setEditMessage] = useState("");
   const [editError, setEditError] = useState("");
 
+  const [currentQuestionPage, setCurrentQuestionPage] = useState(1);
+  const QUESTIONS_PER_PAGE = 30;
+
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userError, setUserError] = useState("");
   const [userMessage, setUserMessage] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
+
+  const [confirmingAction, setConfirmingAction] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  confirmVariant?: "indigo" | "red";
+  onConfirm: (() => Promise<void> | void) | null;
+}>({
+  isOpen: false,
+  title: "",
+  message: "",
+  confirmText: "Confirm",
+  confirmVariant: "indigo",
+  onConfirm: null,
+});
+
+const topicOptions = [
+  { value: "", label: "All topics" },
+  ...topics.map((topic) => ({ value: topic.name, label: topic.name })),
+];
+
+const difficultyOptions = [
+  { value: "", label: "All difficulties" },
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+];
+
+const statusOptions = [
+  { value: "", label: "All statuses" },
+  { value: "available", label: "Available" },
+  { value: "archived", label: "Archived" },
+];
 
   async function loadTopics() {
     try {
@@ -135,10 +243,63 @@ export default function AdminPage() {
   }, [selectedTopic, selectedDifficulty, selectedStatus]);
 
   useEffect(() => {
+    setCurrentQuestionPage(1);
+  }, [selectedTopic, selectedDifficulty, selectedStatus, questionSearch]);
+
+  useEffect(() => {
     if (activeTab === "users") {
       loadUsers();
     }
   }, [activeTab]);
+
+  function openConfirmModal(config: {
+    title: string;
+    message: string;
+    confirmText: string;
+    confirmVariant?: "indigo" | "red";
+    onConfirm: () => Promise<void> | void;
+  }) {
+    setConfirmModal({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      confirmText: config.confirmText,
+      confirmVariant: config.confirmVariant ?? "indigo",
+      onConfirm: config.onConfirm,
+    });
+  }
+
+  function closeConfirmModal() {
+    if (confirmingAction) return;
+
+    setConfirmModal({
+      isOpen: false,
+      title: "",
+      message: "",
+      confirmText: "Confirm",
+      confirmVariant: "indigo",
+      onConfirm: null,
+    });
+  }
+
+  async function handleConfirmModalAction() {
+    if (!confirmModal.onConfirm) return;
+
+    try {
+      setConfirmingAction(true);
+      await confirmModal.onConfirm();
+      setConfirmModal({
+        isOpen: false,
+        title: "",
+        message: "",
+        confirmText: "Confirm",
+        confirmVariant: "indigo",
+        onConfirm: null,
+      });
+    } finally {
+      setConfirmingAction(false);
+    }
+  }
 
   function toggleTopic(topicName: string) {
     setSelectedTopics((prev) =>
@@ -287,116 +448,129 @@ export default function AdminPage() {
       );
       return;
     }
+    openConfirmModal({
+      title: "Save Changes?",
+      message:
+        "Are you sure you want to edit this question? The current version will be superseded.",
+      confirmText: "Save Changes",
+      confirmVariant: "indigo",
+      onConfirm: async () => {
+        try {
+          setEditing(true);
 
-    const confirmed = window.confirm(
-      "Are you sure you want to edit this question? The current version will be superseded.",
-    );
+          await editQuestion(questionNumber, {
+            title: editTitle.trim(),
+            description: editDescription.trim(),
+            difficulty: editDifficulty,
+            topics: editTopics,
+          });
 
-    if (!confirmed) return;
+          setEditMessage("Question updated successfully.");
+          setEditingQuestionId(null);
+          await loadQuestions();
+          await loadTopics();
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to update question.";
+          setEditError(message);
+        } finally {
+          setEditing(false);
+        }
+      },
+    });
 
-    try {
-      setEditing(true);
-
-      await editQuestion(questionNumber, {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        difficulty: editDifficulty,
-        topics: editTopics,
-      });
-
-      setEditMessage("Question updated successfully.");
-      setEditingQuestionId(null);
-      await loadQuestions();
-      await loadTopics();
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to update question.";
-      setEditError(message);
-    } finally {
-      setEditing(false);
-    }
+    return;
   }
 
-  async function handleArchiveQuestion(questionNumber: string | number) {
-    const confirmed = window.confirm(
-      "Are you sure you want to archive this question?",
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await archiveQuestion(questionNumber);
-      await loadQuestions();
-      await loadTopics();
-      setOpenMenuQuestionId(null);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to archive question.";
-      setError(message);
-    }
+  function handleArchiveQuestion(questionNumber: string | number) {
+    openConfirmModal({
+      title: "Archive Question?",
+      message: "Are you sure you want to archive this question?",
+      confirmText: "Archive",
+      confirmVariant: "red",
+      onConfirm: async () => {
+        try {
+          await archiveQuestion(questionNumber);
+          await loadQuestions();
+          await loadTopics();
+          setOpenMenuQuestionId(null);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to archive question.";
+          setError(message);
+        }
+      },
+    });
   }
 
-  async function handleRestoreQuestion(questionNumber: string | number) {
-    const confirmed = window.confirm(
-      "Are you sure you want to restore this question?",
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await restoreQuestion(questionNumber);
-      await loadQuestions();
-      await loadTopics();
-      setOpenMenuQuestionId(null);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to restore question.";
-      setError(message);
-    }
+  function handleRestoreQuestion(questionNumber: string | number) {
+    openConfirmModal({
+      title: "Restore Question?",
+      message: "Are you sure you want to restore this question?",
+      confirmText: "Restore",
+      confirmVariant: "indigo",
+      onConfirm: async () => {
+        try {
+          await restoreQuestion(questionNumber);
+          await loadQuestions();
+          await loadTopics();
+          setOpenMenuQuestionId(null);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to restore question.";
+          setError(message);
+        }
+      },
+    });
   }
 
-  async function handleDeleteQuestion(questionNumber: string | number) {
-    const confirmed = window.confirm(
-      "This will permanently delete the archived question and cannot be undone. Continue?",
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await deleteQuestion(questionNumber);
-      await loadQuestions();
-      await loadTopics();
-      setOpenMenuQuestionId(null);
-      setExpandedQuestionId(null);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to delete question.";
-      setError(message);
-    }
+  function handleDeleteQuestion(questionNumber: string | number) {
+    openConfirmModal({
+      title: "Delete Question?",
+      message:
+        "This will permanently delete the archived question and cannot be undone.",
+      confirmText: "Delete",
+      confirmVariant: "red",
+      onConfirm: async () => {
+        try {
+          await deleteQuestion(questionNumber);
+          await loadQuestions();
+          await loadTopics();
+          setOpenMenuQuestionId(null);
+          setExpandedQuestionId(null);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to delete question.";
+          setError(message);
+        }
+      },
+    });
   }
 
-  async function handlePromoteUser(user: AdminUser) {
-    const confirmed = window.confirm(
-      `Are you sure you want to promote "${user.username}" to admin?`,
-    );
+  function handlePromoteUser(user: AdminUser) {
+    openConfirmModal({
+      title: "Promote User?",
+      message: `Are you sure you want to promote "${user.username}" to admin?`,
+      confirmText: "Promote",
+      confirmVariant: "indigo",
+      onConfirm: async () => {
+        try {
+          setPromotingUserId(user.id);
+          setUserError("");
+          setUserMessage("");
 
-    if (!confirmed) return;
-
-    try {
-      setPromotingUserId(user.id);
-      setUserError("");
-      setUserMessage("");
-
-      await promoteUser(user.id);
-      setUserMessage(`${user.username} has been promoted to admin.`);
-      await loadUsers();
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to promote user.";
-      setUserError(message);
-    } finally {
-      setPromotingUserId(null);
-    }
+          await promoteUser(user.id);
+          setUserMessage(`${user.username} has been promoted to admin.`);
+          await loadUsers();
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to promote user.";
+          setUserError(message);
+        } finally {
+          setPromotingUserId(null);
+        }
+      },
+    });
   }
 
   const filteredQuestions = useMemo(() => {
@@ -431,6 +605,16 @@ export default function AdminPage() {
     });
   }, [questions, questionSearch]);
 
+  const totalQuestionPages = Math.max(
+    1,
+    Math.ceil(filteredQuestions.length / QUESTIONS_PER_PAGE),
+  );
+
+  const paginatedQuestions = filteredQuestions.slice(
+    (currentQuestionPage - 1) * QUESTIONS_PER_PAGE,
+    currentQuestionPage * QUESTIONS_PER_PAGE,
+  );
+
   const filteredUsers = useMemo(() => {
     const keyword = userSearch.trim().toLowerCase();
     if (!keyword) return users;
@@ -443,9 +627,6 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-6xl rounded-2xl bg-white p-8 shadow-md">
       <h1 className="text-2xl font-bold text-slate-800">Admin</h1>
-      <p className="mt-2 text-sm text-slate-500">
-        Manage the PeerPrep question bank and user roles.
-      </p>
 
       <div className="mt-6 flex gap-2 rounded-xl bg-slate-100 p-1">
         <button
@@ -453,7 +634,7 @@ export default function AdminPage() {
           onClick={() => setActiveTab("questions")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             activeTab === "questions"
-              ? "bg-white text-blue-600 shadow-sm"
+              ? "bg-white text-indigo-600 shadow-sm"
               : "text-slate-600 hover:text-slate-800"
           }`}
         >
@@ -464,7 +645,7 @@ export default function AdminPage() {
           onClick={() => setActiveTab("users")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             activeTab === "users"
-              ? "bg-white text-blue-600 shadow-sm"
+              ? "bg-white text-indigo-600 shadow-sm"
               : "text-slate-600 hover:text-slate-800"
           }`}
         >
@@ -478,15 +659,9 @@ export default function AdminPage() {
             <h2 className="text-lg font-semibold text-slate-800">
               Create Question
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Add a new question to the repository.
-            </p>
 
             <form onSubmit={handleCreateQuestion} className="mt-6 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Title
-                </label>
                 <input
                   type="text"
                   value={title}
@@ -495,18 +670,12 @@ export default function AdminPage() {
                     setCreateError("");
                     setCreateMessage("");
                   }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                   placeholder="Enter question title"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Description
-                </label>
-                <p className="mt-1 text-xs text-slate-500">
-                  To insert an image, use: [image:https://example.com/image.png]
-                </p>
                 <textarea
                   value={description}
                   onChange={(e) => {
@@ -515,29 +684,30 @@ export default function AdminPage() {
                     setCreateMessage("");
                   }}
                   rows={6}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                   placeholder="Enter question description"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  To insert an image, use: [image:https://example.com/image.png]
+                </p>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Difficulty
-                </label>
-                <select
+                <CustomDropdown
                   value={difficulty}
-                  onChange={(e) => {
-                    setDifficulty(e.target.value);
+                  onChange={(value) => {
+                    setDifficulty(value);
                     setCreateError("");
                     setCreateMessage("");
                   }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">Select difficulty</option>
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
+                  options={[
+                    { value: "", label: "Select difficulty" },
+                    { value: "easy", label: "Easy" },
+                    { value: "medium", label: "Medium" },
+                    { value: "hard", label: "Hard" },
+                  ]}
+                  placeholder="Select difficulty"
+                />
               </div>
 
               <div>
@@ -572,14 +742,14 @@ export default function AdminPage() {
                           setTopicError("");
                           setTopicMessage("");
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                         placeholder="Enter new topic name"
                       />
                       <button
                         type="button"
                         onClick={handleCreateTopic}
                         disabled={creatingTopic}
-                        className="whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        className="whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         {creatingTopic ? "Adding..." : "Add"}
                       </button>
@@ -613,7 +783,7 @@ export default function AdminPage() {
                           }}
                           className={`rounded-full px-3 py-1 text-sm transition ${
                             selected
-                              ? "bg-blue-600 text-white"
+                              ? "bg-indigo-600 text-white"
                               : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                           }`}
                         >
@@ -635,7 +805,7 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={creating}
-                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {creating ? "Creating..." : "Create Question"}
               </button>
@@ -646,72 +816,44 @@ export default function AdminPage() {
             <h2 className="text-lg font-semibold text-slate-800">
               Question Bank Management
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Filter questions by topic, difficulty, and status.
-            </p>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Topic
-                </label>
-                <select
+                <CustomDropdown
                   value={selectedTopic}
-                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  onChange={setSelectedTopic}
+                  options={topicOptions}
+                  placeholder="All topics"
                   disabled={loadingTopics}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">All topics</option>
-                  {topics.map((topic) => (
-                    <option key={topic.name} value={topic.name}>
-                      {topic.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Difficulty
-                </label>
-                <select
+                <CustomDropdown
                   value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">All difficulties</option>
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
+                  onChange={setSelectedDifficulty}
+                  options={difficultyOptions}
+                  placeholder="All difficulties"
+                />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Status
-                </label>
-                <select
+                <CustomDropdown
                   value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">All statuses</option>
-                  <option value="available">Available</option>
-                  <option value="archived">Archived</option>
-                </select>
+                  onChange={setSelectedStatus}
+                  options={statusOptions}
+                  placeholder="All statuses"
+                />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Search Questions
-              </label>
               <input
                 type="text"
                 value={questionSearch}
                 onChange={(e) => setQuestionSearch(e.target.value)}
                 placeholder="Search by title, topic, content, or #question-number"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               />
             </div>
 
@@ -726,7 +868,7 @@ export default function AdminPage() {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {filteredQuestions.map((question) => {
+                  {paginatedQuestions.map((question) => {
                     const isExpanded = expandedQuestionId === question.id;
 
                     return (
@@ -751,7 +893,7 @@ export default function AdminPage() {
 
                           <div className="flex items-start gap-2">
                             <div className="flex flex-wrap gap-2">
-                              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+                              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
                                 {question.difficulty}
                               </span>
                               <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
@@ -909,9 +1051,6 @@ export default function AdminPage() {
                             </h4>
 
                             <div>
-                              <label className="mb-1 block text-sm font-medium text-slate-700">
-                                Title
-                              </label>
                               <input
                                 type="text"
                                 value={editTitle}
@@ -920,18 +1059,11 @@ export default function AdminPage() {
                                   setEditError("");
                                   setEditMessage("");
                                 }}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                               />
                             </div>
 
                             <div>
-                              <label className="mb-1 block text-sm font-medium text-slate-700">
-                                Description
-                              </label>
-                              <p className="mt-1 text-xs text-slate-500">
-                                To insert an image, use:
-                                [image:https://example.com/image.png]
-                              </p>
                               <textarea
                                 rows={6}
                                 value={editDescription}
@@ -940,28 +1072,30 @@ export default function AdminPage() {
                                   setEditError("");
                                   setEditMessage("");
                                 }}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                               />
+                              <p className="mt-1 text-xs text-slate-500">
+                                To insert an image, use:
+                                [image:https://example.com/image.png]
+                              </p>
                             </div>
 
                             <div>
-                              <label className="mb-1 block text-sm font-medium text-slate-700">
-                                Difficulty
-                              </label>
-                              <select
+                              <CustomDropdown
                                 value={editDifficulty}
-                                onChange={(e) => {
-                                  setEditDifficulty(e.target.value);
+                                onChange={(value) => {
+                                  setEditDifficulty(value);
                                   setEditError("");
                                   setEditMessage("");
                                 }}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                              >
-                                <option value="">Select difficulty</option>
-                                <option value="easy">Easy</option>
-                                <option value="medium">Medium</option>
-                                <option value="hard">Hard</option>
-                              </select>
+                                options={[
+                                  { value: "", label: "Select difficulty" },
+                                  { value: "easy", label: "Easy" },
+                                  { value: "medium", label: "Medium" },
+                                  { value: "hard", label: "Hard" },
+                                ]}
+                                placeholder="Select difficulty"
+                              />
                             </div>
 
                             <div>
@@ -984,7 +1118,7 @@ export default function AdminPage() {
                                       }}
                                       className={`rounded-full px-3 py-1 text-sm transition ${
                                         selected
-                                          ? "bg-blue-600 text-white"
+                                          ? "bg-indigo-600 text-white"
                                           : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                                       }`}
                                     >
@@ -1010,7 +1144,7 @@ export default function AdminPage() {
                               <button
                                 type="submit"
                                 disabled={editing}
-                                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                               >
                                 {editing ? "Saving..." : "Save Changes"}
                               </button>
@@ -1028,6 +1162,49 @@ export default function AdminPage() {
                       </div>
                     );
                   })}
+                  <div className="mt-6 flex items-center justify-between">
+                    <p className="text-sm text-slate-500">
+                      Showing{" "}
+                      {(currentQuestionPage - 1) * QUESTIONS_PER_PAGE + 1}–
+                      {Math.min(
+                        currentQuestionPage * QUESTIONS_PER_PAGE,
+                        filteredQuestions.length,
+                      )}{" "}
+                      of {filteredQuestions.length} questions
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentQuestionPage((prev) =>
+                            Math.max(prev - 1, 1),
+                          )
+                        }
+                        disabled={currentQuestionPage === 1}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+
+                      <span className="text-sm text-slate-600">
+                        Page {currentQuestionPage} of {totalQuestionPages}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentQuestionPage((prev) =>
+                            Math.min(prev + 1, totalQuestionPages),
+                          )
+                        }
+                        disabled={currentQuestionPage === totalQuestionPages}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1040,20 +1217,14 @@ export default function AdminPage() {
           <h2 className="text-lg font-semibold text-slate-800">
             Promote Users to Admin
           </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            View all registered users and promote selected users to admin.
-          </p>
 
           <div className="mt-6">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Search Username
-            </label>
             <input
               type="text"
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               placeholder="Search users by username"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
@@ -1100,7 +1271,7 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => handlePromoteUser(user)}
                             disabled={promotingUserId === user.id}
-                            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                           >
                             {promotingUserId === user.id
                               ? "Promoting..."
@@ -1113,6 +1284,43 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-800">
+              {confirmModal.title}
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-600">
+              {confirmModal.message}
+            </p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closeConfirmModal}
+                disabled={confirmingAction}
+                className="w-full rounded-xl border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmModalAction}
+                disabled={confirmingAction}
+                className={`w-full rounded-xl px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+                  confirmModal.confirmVariant === "red"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
+              >
+                {confirmingAction ? "Processing..." : confirmModal.confirmText}
+              </button>
+            </div>
           </div>
         </div>
       )}

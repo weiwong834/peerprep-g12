@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
                     setEmail(e.target.value);
                     setError("");
                   }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                 />
                 <div className="mt-1 min-h-5 text-sm">
                   {email && !emailFormatValid && (
@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={sending}
-                className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {sending ? "Sending..." : "Send Reset Link"}
               </button>
@@ -87,7 +87,7 @@ export default function ForgotPasswordPage() {
         )}
 
         <div className="mt-5 text-center text-sm text-slate-600">
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-indigo-600 hover:underline">
             Back to login
           </Link>
         </div>

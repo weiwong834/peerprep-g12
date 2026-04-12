@@ -428,7 +428,7 @@ export default function CollaborationRoom({
         )}
 
         {canRejoinQueue && (
-          <p className="mb-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
+          <p className="mb-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
             You can rejoin the matching queue immediately.
           </p>
         )}
@@ -467,7 +467,7 @@ export default function CollaborationRoom({
           ) : (
             <button
               onClick={onLeave}
-              className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              className="bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700"
             >
               Back to Matching
             </button>
@@ -499,7 +499,7 @@ export default function CollaborationRoom({
             onClick={() => setActiveTab("Partner Chat")}
             className={`px-3 py-2 text-sm ${
               activeTab === "Partner Chat"
-                ? "border-b-2 border-blue-500 font-medium"
+                ? "border-b-2 border-indigo-500 font-medium"
                 : "text-gray-500"
             }`}
           >
@@ -510,7 +510,7 @@ export default function CollaborationRoom({
             onClick={() => setActiveTab("AI Chat")}
             className={`px-3 py-2 text-sm ${
               activeTab === "AI Chat"
-                ? "border-b-2 border-blue-500 font-medium"
+                ? "border-b-2 border-indigo-500 font-medium"
                 : "text-gray-500"
             }`}
           >
@@ -521,7 +521,7 @@ export default function CollaborationRoom({
             onClick={() => setActiveTab("AI Explanations")}
             className={`px-3 py-2 text-sm ${
               activeTab === "AI Explanations"
-                ? "border-b-2 border-blue-500 font-medium"
+                ? "border-b-2 border-indigo-500 font-medium"
                 : "text-gray-500"
             }`}
           >

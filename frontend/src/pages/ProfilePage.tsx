@@ -268,7 +268,7 @@ export default function ProfilePage() {
                 setUsernameMessage("");
                 setNewUsername(user.username);
               }}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
             >
               {showUsernameEditor ? "Cancel" : "Change Username"}
             </button>
@@ -289,7 +289,7 @@ export default function ProfilePage() {
                     setUsernameMessage("");
                     setUsernameAvailable(null);
                   }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                 />
                 <div className="mt-1 min-h-5 text-sm">
                   {newUsername && usernameValidationError && (
@@ -354,7 +354,7 @@ export default function ProfilePage() {
                   !!usernameValidationError ||
                   usernameAvailable === false
                 }
-                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {savingUsername ? "Saving..." : "Save Username"}
               </button>
@@ -379,7 +379,7 @@ export default function ProfilePage() {
             type="button"
             onClick={handleSendPasswordResetEmail}
             disabled={sendingResetEmail}
-            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {sendingResetEmail ? "Sending..." : "Send Password Reset Email"}
           </button>

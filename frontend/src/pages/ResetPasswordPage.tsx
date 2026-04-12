@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
                   setPassword(e.target.value);
                   setError("");
                 }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               />
             </div>
 
@@ -129,7 +129,7 @@ export default function ResetPasswordPage() {
                   setConfirmPassword(e.target.value);
                   setError("");
                 }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               />
               <div className="mt-1 min-h-5 text-sm">
                 {confirmPassword.length > 0 && passwordsMatch && (
@@ -146,7 +146,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={submitting || !(passwordValid && passwordsMatch)}
-              className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {submitting ? "Resetting..." : "Reset Password"}
             </button>
@@ -158,7 +158,7 @@ export default function ResetPasswordPage() {
         )}
 
         <div className="mt-5 text-center text-sm text-slate-600">
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-indigo-600 hover:underline">
             Back to login
           </Link>
         </div>

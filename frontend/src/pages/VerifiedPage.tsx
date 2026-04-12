@@ -15,7 +15,7 @@ export default function VerifiedPage() {
         <div className="mt-6">
           <Link
             to="/login"
-            className="inline-block rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+            className="inline-block rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700"
           >
             Go to Login
           </Link>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import { loginUser, getUserInfo } from "../services/userService";
 
 export default function LoginPage() {
@@ -11,7 +12,6 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
 
     if (!email || !password) {
       setError("Please enter both email and password.");
@@ -25,7 +25,7 @@ export default function LoginPage() {
       navigate("/home");
     } catch (err: any) {
       if (err?.code === "INVALID_CREDENTIALS") {
-        setError("Invalid email or password.");
+        setError("");
       } else {
         setError(err?.message || "Login failed. Please try again.");
       }
@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-xl backdrop-blur">
         <h1 className="text-2xl font-bold text-slate-800 text-center">
           PeerPrep
         </h1>
@@ -46,11 +46,13 @@ export default function LoginPage() {
               Email
             </label>
             <input
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="email"
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
@@ -64,36 +66,62 @@ export default function LoginPage() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               />
 
               <button
                 type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-slate-500 hover:text-slate-700"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                onMouseDown={() => setShowPassword(true)}
+                onMouseUp={() => setShowPassword(false)}
+                onMouseLeave={() => setShowPassword(false)}
+                onTouchStart={() => setShowPassword(true)}
+                onTouchEnd={() => setShowPassword(false)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-600 transition"
+                aria-label="Hold to show password"
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? (
+                  <FiEye className="w-5 h-5" />
+                ) : (
+                  <FiEyeOff className="w-5 h-5" />
+                )}
               </button>
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+            >
+              <div className="whitespace-pre-wrap">{error}</div>
+              <button
+                type="button"
+                aria-label="Dismiss error"
+                onClick={() => setError("")}
+                className="ml-2 rounded-md px-2 py-1 text-sm text-red-600 hover:bg-red-100"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700"
+            className="w-full rounded-xl bg-indigo-600 py-2.5 font-medium text-white transition hover:bg-indigo-700 shadow-sm hover:shadow"
           >
             Log In
           </button>
         </form>
 
         <div className="mt-4 flex items-center justify-between text-sm">
-          <Link to="/forgot-password" className="text-blue-600 hover:underline">
+          <Link
+            to="/forgot-password"
+            className="text-indigo-600 hover:underline"
+          >
             Forgot password?
           </Link>
 
-          <Link to="/signup" className="text-blue-600 hover:underline">
+          <Link to="/signup" className="text-indigo-600 hover:underline">
             Sign up
           </Link>
         </div>
