@@ -18,6 +18,7 @@ type CollabState =
   | "connecting"
   | "waiting"
   | "confirming"
+  | "timed_out"
   | "active"
   | "error"
   | "banned";
@@ -129,6 +130,7 @@ export default function CollabPage() {
 
   const [message, setMessage] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [returnCountdown, setReturnCountdown] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState("");
   const [proposedMatch, setProposedMatch] = useState<CandidateMatch | null>(
     null,
@@ -275,7 +277,9 @@ export default function CollabPage() {
           ) {
             setState("banned");
           } else {
-            setState("idle");
+            setState("timed_out");
+            setReturnCountdown(3);
+            setMessage(payload.message || "No match found.");
           }
           break;
 
@@ -382,6 +386,23 @@ export default function CollabPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  useEffect(() => {
+    if (state !== "timed_out" || returnCountdown === null) return;
+
+    if (returnCountdown <= 0) {
+      setState("idle");
+      setReturnCountdown(null);
+      setMessage("");
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setReturnCountdown((prev) => (prev === null ? null : prev - 1));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [state, returnCountdown]);
+
   function handleFindMatch() {
     if (!socketRef.current || !isConnected) {
       setState("error");
@@ -427,6 +448,7 @@ export default function CollabPage() {
   function resetMatchState(nextState: CollabState = "idle") {
     setState(nextState);
     setCountdown(null);
+    setReturnCountdown(null);
     setProposedMatch(null);
     setSessionId("");
     setConfirmationChoice(null);
@@ -484,10 +506,11 @@ export default function CollabPage() {
   }
 
   const showMatchingBase =
-    state === "idle" || state === "waiting" || state === "confirming";
+    state === "idle" || state === "waiting" || state === "confirming" || state === "timed_out"; 
 
   const showWaitingModal = state === "waiting";
   const showConfirmingModal = state === "confirming";
+  const showTimeoutModal = state === "timed_out";
 
   if (state === "connecting") {
     return (
@@ -505,7 +528,7 @@ export default function CollabPage() {
       <div className="max-w-6xl relative">
         <div
           className={`transition duration-200 ${
-            showWaitingModal || showConfirmingModal
+            showWaitingModal || showConfirmingModal || showTimeoutModal
               ? "blur-sm pointer-events-none select-none"
               : ""
           }`}
@@ -625,7 +648,7 @@ export default function CollabPage() {
           </div>
         </div>
 
-        {(showWaitingModal || showConfirmingModal) && (
+        {(showWaitingModal || showConfirmingModal || showTimeoutModal) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
             <div className="absolute inset-0 rounded-2xl bg-white/30" />
 
@@ -739,6 +762,33 @@ export default function CollabPage() {
                       Decline Match
                     </button>
                   </div>
+                </>
+              )}
+
+              {showTimeoutModal && (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-800">
+                    No Match Found
+                  </h2>
+
+                  <p className="text-slate-600">
+                    Returning to matching page in{" "}
+                    <span className="font-semibold text-indigo-600">
+                      {returnCountdown}
+                    </span>
+                    ...
+                  </p>
+
+                  <button
+                    onClick={() => {
+                      setState("idle");
+                      setReturnCountdown(null);
+                      setMessage("");
+                    }}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                  >
+                    Return Now
+                  </button>
                 </>
               )}
             </div>
