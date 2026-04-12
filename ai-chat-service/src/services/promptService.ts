@@ -51,8 +51,8 @@ User's Current Code:
 \`\`\``;
 
 // Might need to later modify to separate system prompt from user prompt depending on AI API parameters
-export const buildPrompt = (input: PromptContextInput): string => {
-    let sessionContext = SYSTEM_PROMPT_CONTEXT
+export const buildPrompt = (input: PromptContextInput): PromptPayload => {
+	const sessionContext = SYSTEM_PROMPT_CONTEXT
 		.split("{{PROGRAMMING_LANGUAGE}}").join(input.language)
         .replace("{{QUESTION_TOPIC}}", input.topic)
         .replace("{{QUESTION_TITLE}}", input.questionTitle)
@@ -74,5 +74,5 @@ export const buildPrompt = (input: PromptContextInput): string => {
 		};
     
     logger.info("Built prompt for response generation");
-		return JSON.stringify(payload);
+		return payload;
 }

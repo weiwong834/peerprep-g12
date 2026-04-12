@@ -109,7 +109,7 @@ export async function sendPrompt(req: Request, res: Response): Promise<void> {
 		const aiResponse = await generateAiResponse({
 			sessionId,
 			userId,
-			prompt: craftedPrompt,
+			promptPayload: craftedPrompt,
 		});
 
 		res.status(200).json({ response: aiResponse });
