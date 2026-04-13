@@ -6,6 +6,7 @@ import { MatchingService } from './services/matchingService.js';
 import { RedisService } from './services/redisService.js';
 import { QuestionService } from './services/questionService.js';
 import { createLogger } from './utils/logger.js';
+import { createSocketAuthMiddleware } from './middleware/authMiddleware.js';
 import {
   ActionFlowStatus,
   MatchResponseStatus,
@@ -27,8 +28,9 @@ const io = new Server(httpServer, {
 });
 
 const redisService = new RedisService();
-const collaborationServiceBaseUrl = process.env.COLLABORATION_SERVICE_URL ?? 'http://localhost:3003';
+const userServiceBaseUrl = process.env.USER_SERVICE_URL ?? 'http://localhost:3000';
 const questionServiceBaseUrl = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:3001';
+const collaborationServiceBaseUrl = process.env.COLLABORATION_SERVICE_URL ?? 'http://localhost:3003';
 const questionService = new QuestionService(questionServiceBaseUrl);
 const matchingService = new MatchingService(io, redisService, questionService, collaborationServiceBaseUrl);
 
@@ -43,6 +45,9 @@ app.get('/', (_req: Request, res: Response) => {
 
 // Routes
 app.use('/', createMatchingRoutes(redisService, matchingService));
+
+// One-time JWT auth at handshake
+io.use(createSocketAuthMiddleware(userServiceBaseUrl));
 
 // Listens for connection event
 // TBD with frontend: Should frontend connect to socket upon entering matching page?

@@ -1,3 +1,5 @@
+import { parseQuestionDescriptionToBlocks, validateQuestionDescriptionTags } from "./questionBlockParser";
+
 const API_BASE =
   import.meta.env.VITE_QUESTION_SERVICE_URL || "http://localhost:3001";
   
@@ -106,18 +108,20 @@ export async function createQuestion(payload: {
   difficulty: string;
   topics: string[];
 }) {
+  const validationError = validateQuestionDescriptionTags(payload.description);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const blocks = parseQuestionDescriptionToBlocks(payload.description);
+
   return authQuestionFetch<Question>(`${API_BASE}/questions`, {
     method: "POST",
     body: JSON.stringify({
       title: payload.title,
       difficulty: payload.difficulty,
       topics: payload.topics,
-      blocks: [
-        {
-          block_type: "text",
-          content: payload.description,
-        },
-      ],
+      blocks,
     }),
   });
 }
@@ -131,6 +135,19 @@ export async function editQuestion(
     topics?: string[];
   },
 ) {
+  let blocks;
+
+  if (payload.description !== undefined) {
+    const validationError = validateQuestionDescriptionTags(
+      payload.description,
+    );
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    blocks = parseQuestionDescriptionToBlocks(payload.description);
+  }
+
   return authQuestionFetch<Question>(
     `${API_BASE}/questions/${questionNumber}`,
     {
@@ -139,16 +156,7 @@ export async function editQuestion(
         title: payload.title,
         difficulty: payload.difficulty,
         topics: payload.topics,
-        ...(payload.description !== undefined
-          ? {
-              blocks: [
-                {
-                  block_type: "text",
-                  content: payload.description,
-                },
-              ],
-            }
-          : {}),
+        ...(blocks !== undefined ? { blocks } : {}),
       }),
     },
   );

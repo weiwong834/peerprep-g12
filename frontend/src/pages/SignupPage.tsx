@@ -47,6 +47,7 @@ export default function SignupPage() {
 
   const usernameError = getUsernameError(username);
   const usernameFormatValid = usernameError === null;
+  const canEnterPassword = usernameFormatValid && usernameAvailable === true;
 
   const passwordChecks = useMemo(
     () => ({
@@ -156,11 +157,11 @@ export default function SignupPage() {
     }
 
     if (valid === true) {
-      return <span className="text-green-600">✓ Valid</span>;
+      return <span className="text-green-600">Valid</span>;
     }
 
     if (valid === false) {
-      return <span className="text-red-500">✗ Not available</span>;
+      return <span className="text-red-500">Not available</span>;
     }
 
     return null;
@@ -169,7 +170,7 @@ export default function SignupPage() {
   function requirementItem(label: string, met: boolean) {
     return (
       <li className={met ? "text-green-600" : "text-slate-500"}>
-        {met ? "✓" : "•"} {label}
+        {"•"} {label}
       </li>
     );
   }
@@ -198,7 +199,7 @@ export default function SignupPage() {
           <div className="mt-6">
             <Link
               to="/login"
-              className="inline-block rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+              className="inline-block rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700"
             >
               Back to Login
             </Link>
@@ -226,15 +227,12 @@ export default function SignupPage() {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
             <div className="mt-1 min-h-5 text-sm">
               {!email && null}
               {email && !emailFormatValid && (
-                <span className="text-red-500">✗ Invalid email format</span>
-              )}
-              {email && emailFormatValid && (
-                <span className="text-green-600">✓ Valid email format</span>
+                <span className="text-red-500">Invalid email format</span>
               )}
               {emailSubmitError && (
                 <div className="text-red-500">{emailSubmitError}</div>
@@ -251,7 +249,7 @@ export default function SignupPage() {
               placeholder="Choose a username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
             <div className="mt-1 min-h-5 text-sm">
               {!username && (
@@ -264,20 +262,12 @@ export default function SignupPage() {
               )}
 
               {username && usernameError && (
-                <span className="text-red-500">✗ {usernameError}</span>
+                <span className="text-red-500">{usernameError}</span>
               )}
 
               {username &&
                 usernameFormatValid &&
                 renderStatus(usernameAvailable, usernameChecking)}
-
-              {username &&
-                usernameFormatValid &&
-                usernameAvailable === true && (
-                  <span className="ml-2 text-green-600">
-                    Username is available
-                  </span>
-                )}
 
               {usernameSubmitError && (
                 <div className="text-red-500">{usernameSubmitError}</div>
@@ -295,10 +285,11 @@ export default function SignupPage() {
               placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              disabled={!canEnterPassword}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
-
-            <ul className="mt-2 space-y-1 text-sm">
+            {canEnterPassword ? (
+              <ul className="mt-2 space-y-1 text-sm">
               {requirementItem(
                 "At least 8 characters",
                 passwordChecks.minLength,
@@ -317,6 +308,8 @@ export default function SignupPage() {
                 passwordChecks.special,
               )}
             </ul>
+            ) : null }
+            
           </div>
 
           {/* Confirm Password */}
@@ -329,15 +322,16 @@ export default function SignupPage() {
               placeholder="Retype your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              disabled={!canEnterPassword}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-slate-100"
             />
 
             <div className="mt-1 min-h-5 text-sm">
               {confirmPassword.length > 0 && passwordsMatch && (
-                <span className="text-green-600">✓ Passwords match</span>
+                <span className="text-green-600">Passwords match</span>
               )}
               {confirmPassword.length > 0 && !passwordsMatch && (
-                <span className="text-red-500">✗ Passwords do not match</span>
+                <span className="text-red-500">Passwords do not match</span>
               )}
             </div>
           </div>
@@ -347,7 +341,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Sign Up
           </button>
@@ -355,7 +349,7 @@ export default function SignupPage() {
 
         <div className="mt-5 text-center text-sm text-slate-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-indigo-600 hover:underline">
             Log in
           </Link>
         </div>

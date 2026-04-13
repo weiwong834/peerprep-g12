@@ -52,12 +52,17 @@ export const initCollabService = (httpServer: HttpServer) => {
 
         socket.data.sessionId = sessionId;
         socket.data.userId = userId;
+        socket.data.username = username;
 
         const room = io.sockets.adapter.rooms.get(sessionId);
         const participantCount = room ? room.size : 0;
 
         if (participantCount > 1) {
-          socket.emit("partner-already-present");
+          const roomSockets = await io.in(sessionId).fetchSockets();
+          const partnerSocket = roomSockets.find((s) => s.id !== socket.id);
+          socket.emit("partner-already-present", {
+            username: partnerSocket?.data?.username || "",
+          });
         }
 
         // restore latest code state from Redis (F11.2.3)
@@ -214,7 +219,10 @@ export const initCollabService = (httpServer: HttpServer) => {
     socket.on('disconnect', async () => {
       const { sessionId, userId } = socket.data;
       if (sessionId && userId) {
-        socket.to(sessionId).emit('user-disconnected', { userId });
+        socket.to(sessionId).emit('user-disconnected', { 
+          userId,
+          username: socket.data.username || "",
+        });
         console.log(`User ${userId} disconnected from session ${sessionId}`);
 
       // Check if room is now empty, if so stop the interval

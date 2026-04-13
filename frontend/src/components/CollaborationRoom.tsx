@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import * as Y from "yjs";
+import Editor from "@monaco-editor/react";
+import Chat from "./Chat";
 import type { Session } from "../services/collaborationService";
 import type { Question } from "../services/questionService";
-import ChatPanel from "./ChatPanel";
+import { getAiExplanation, getRemainingRequests } from "../services/aiExplanationsService";
+import type { AIExplanationType } from "../services/aiExplanationsService";
+import {
+  getAiChatHistory,
+  getRemainingPromptCount,
+  sendPromptToAiChat,
+} from "../services/aiChatService";
 
 const COLLAB_SERVER_URL =
   import.meta.env.VITE_COLLAB_SERVICE_URL || "http://localhost:3003";
@@ -16,11 +24,16 @@ type Props = {
   onLeave: () => void;
 };
 
+type AiChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function CollaborationRoom({
   session,
   question,
   userId,
-  username,
+  username: currentUsername,
   onLeave,
 }: Props) {
   const socketRef = useRef<Socket | null>(null);
@@ -33,12 +46,24 @@ export default function CollaborationRoom({
 
   const [code, setCode] = useState("");
   const [roomMessage, setRoomMessage] = useState("");
-  const [partnerJoined, setPartnerJoined] = useState(false);
-  const [partnerDisconnected, setPartnerDisconnected] = useState(false);
+  const [partnerName, setPartnerName] = useState<string>("");
+  const [partnerConnected, setPartnerConnected] = useState(false);
   const [idleWarning, setIdleWarning] = useState("");
   const [sessionEndedMessage, setSessionEndedMessage] = useState("");
   const [earlyTerminationWarning, setEarlyTerminationWarning] = useState("");
   const [canRejoinQueue, setCanRejoinQueue] = useState(false);
+  const [aiResponse, setAIResponse] = useState("");
+  const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
+  const [aiChatHistoryLoading, setAiChatHistoryLoading] = useState(true);
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
+  const [remainingPrompts, setRemainingPrompts] = useState<number | null>(null);
+  const [promptCountLoading, setPromptCountLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  type TabType = "Partner Chat" | "AI Chat" | "AI Explanations";
+  const [activeTab, setActiveTab] = useState<TabType>("Partner Chat");
+
   useEffect(() => {
     const socket = io(COLLAB_SERVER_URL, {
       transports: ["websocket"],
@@ -93,12 +118,12 @@ export default function CollaborationRoom({
       socket.emit("join-session", {
         sessionId: session.session_id,
         userId,
-        username,
+        username: currentUsername,
       });
     });
 
     socket.on("session-joined", () => {
-      setRoomMessage("Joined collaboration room.");
+      setRoomMessage("");
 
       initialSyncResolvedRef.current = false;
 
@@ -123,10 +148,12 @@ export default function CollaborationRoom({
       }, 500);
     });
 
-    socket.on("partner-already-present", () => {
-      setPartnerJoined(true);
-      setPartnerDisconnected(false);
-      setRoomMessage("Your partner is already in the room.");
+    socket.on("partner-already-present", ({ username }: { username?: string}) => {
+      if (username && username !== currentUsername) {
+        setPartnerName(username);
+      }
+      setPartnerConnected(true);
+      setRoomMessage("");
     });
 
     socket.on("code-restored", ({ code }: { code: string }) => {
@@ -167,15 +194,19 @@ export default function CollaborationRoom({
     });
 
     socket.on("user-joined", ({ username }: { username: string }) => {
-      setPartnerJoined(true);
-      setPartnerDisconnected(false);
-      setRoomMessage(`${username} joined the room.`);
+      if (username !== currentUsername) {
+        setPartnerName(username);
+      }
+      setPartnerConnected(true);
+      setRoomMessage("");
     });
 
-    socket.on("user-disconnected", ({ userId: disconnectedUserId }) => {
-      setPartnerDisconnected(true);
-      setPartnerJoined(false);
-      setRoomMessage(`User ${disconnectedUserId} disconnected.`);
+    socket.on("user-disconnected", ({ username }: { username: string }) => {
+      if (username && username !== currentUsername) {
+        setPartnerName(username);
+      }
+      setPartnerConnected(false);
+      setRoomMessage("");
     });
 
     socket.on("idle-warning", ({ message }: { message: string }) => {
@@ -229,7 +260,99 @@ export default function CollaborationRoom({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [session.session_id, userId, username]);
+  }, [session.session_id, userId, currentUsername]);
+
+  useEffect(() => {
+    async function fetchRemaining() {
+      try {
+        const data = await getRemainingRequests(
+          session.session_id,
+          userId
+        );
+        setRemainingRequests(data.remainingRequests);
+      } catch (err) {
+        console.error("Failed to fetch remaining requests", err);
+      }
+    }
+
+    fetchRemaining();
+  }, [session.session_id, userId]);
+
+  useEffect(() => {
+    async function fetchAiChatHistory() {
+      setAiChatHistoryLoading(true);
+
+      try {
+        const data = await getAiChatHistory(session.session_id, userId);
+        setAiChatMessages(data.messages);
+      } catch (err) {
+        console.error("Failed to fetch AI chat history", err);
+        setAiChatMessages([]);
+      } finally {
+        setAiChatHistoryLoading(false);
+      }
+    }
+
+    fetchAiChatHistory();
+  }, [session.session_id, userId]);
+
+  // Poll ai chat service backend to get remaining prompt count every 4 seconds
+  const refreshRemainingPrompts = useCallback(
+    async (showLoading = false) => {
+      if (showLoading) {
+        setPromptCountLoading(true);
+      }
+
+      try {
+        const data = await getRemainingPromptCount(
+          session.session_id,
+          userId,
+        );
+        setRemainingPrompts(data.remainingRequests);
+      } catch (err) {
+        console.error("Failed to fetch remaining prompts", err);
+        setRemainingPrompts(null);
+      } finally {
+        if (showLoading) {
+          setPromptCountLoading(false);
+        }
+      }
+    },
+    [session.session_id, userId],
+  );
+
+  useEffect(() => {
+    void refreshRemainingPrompts(true);
+  }, [refreshRemainingPrompts]);
+
+  useEffect(() => {
+    if (!isChatOpen || activeTab !== "AI Chat") {
+      return;
+    }
+
+    void refreshRemainingPrompts(false);
+
+    const intervalId = window.setInterval(() => {
+      void refreshRemainingPrompts(false);
+    }, 4000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isChatOpen, activeTab, refreshRemainingPrompts]);
+
+  function getEditorLanguage(language: string) {
+    switch (language.toLowerCase()) {
+      case "javascript":
+        return "javascript";
+      case "python":
+        return "python";
+      case "java":
+        return "java";
+      default:
+        return "plaintext";
+    }
+  }
 
   function handleCodeChange(nextValue: string) {
     const ydoc = ydocRef.current;
@@ -266,14 +389,58 @@ export default function CollaborationRoom({
     });
   }
 
-  const description =
-    question.blocks
-      ?.filter((block) => block.block_type === "text")
-      .map((block) => block.content)
-      .join("\n\n") || "No question description available.";
+  async function handleAIRequest(type: AIExplanationType) {
+  if (type === "EXPLAIN_CODE" && (!code || code.trim().length === 0)) {
+    setAIResponse("There is no code yet to explain.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const fullQuestion =
+      question.blocks?.length
+        ? question.blocks
+            .filter((block) => block.block_type === "text")
+            .map((block) => block.content)
+            .join("\n\n")
+        : question.title;
+
+    const data = await getAiExplanation(
+      type,
+      fullQuestion,
+      code,
+      session.session_id,
+      userId,
+    );
+
+    setAIResponse(data.response);
+    setRemainingRequests(data.remainingRequests);
+  } catch (err) {
+    console.log("Error fetching AI explanation:", err);
+    setAIResponse("Error fetching AI response.");
+    
+  } finally {
+    setLoading(false);
+  }
+}
+
+  async function handleSendAiChatPrompt(prompt: string): Promise<string> {
+    const data = await sendPromptToAiChat(session.session_id, userId, prompt);
+    void refreshRemainingPrompts(false);
+    return data.response;
+  }
+
+  function appendAiChatMessage(message: AiChatMessage) {
+    setAiChatMessages((prev) => [...prev, message]);
+  }
 
   return (
-    <div className="grid grid-cols-3 gap-6 h-[80vh]">
+    <div
+      className={`grid gap-3 h-[calc(100dvh-4rem)] min-h-0 ${
+        isChatOpen ? "grid-cols-3" : "grid-cols-2"
+      }`}
+    >
       <div className="bg-white rounded-xl shadow-sm p-6 overflow-auto">
         <h2 className="text-lg font-semibold mb-3">{question.title}</h2>
 
@@ -292,13 +459,71 @@ export default function CollaborationRoom({
           </p>
         </div>
 
-        <pre className="whitespace-pre-wrap text-sm text-slate-700">
-          {description}
-        </pre>
+        <div className="space-y-4">
+          {question.blocks && question.blocks.length > 0 ? (
+            question.blocks.map((block, index) => {
+              if (block.block_type === "text") {
+                return (
+                  <pre
+                    key={index}
+                    className="whitespace-pre-wrap text-sm text-slate-700 font-sans"
+                  >
+                    {block.content}
+                  </pre>
+                );
+              }
+
+              if (block.block_type === "image") {
+                return (
+                  <div key={index} className="space-y-2">
+                    <img
+                      src={block.content}
+                      alt={`Question image ${index + 1}`}
+                      className="max-w-full rounded-lg border"
+                    />
+                  </div>
+                );
+              }
+
+              return null;
+            })
+          ) : (
+            <p className="text-sm text-slate-500">
+              No question description available.
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col">
-        <h2 className="text-lg font-semibold mb-3">Code Editor</h2>
+      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col min-h-0">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Code Editor</h2>
+          <button
+            onClick={() => setIsChatOpen((prev) => !prev)}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              isChatOpen
+                ? "bg-indigo-100 border-indigo-300 text-indigo-700"
+                : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+            }`}
+            aria-label="Toggle chat panel"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-4 w-4"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7 8h10M7 12h6m-9 9 3.6-3H20a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h.4L4 21Z"
+              />
+            </svg>
+            {isChatOpen ? "Hide chat" : "Need help?"}
+          </button>
+        </div>
 
         {roomMessage && (
           <p className="mb-2 text-sm text-slate-600">{roomMessage}</p>
@@ -323,18 +548,33 @@ export default function CollaborationRoom({
         )}
 
         {canRejoinQueue && (
-          <p className="mb-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
+          <p className="mb-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
             You can rejoin the matching queue immediately.
           </p>
         )}
 
-        <textarea
-          value={code}
-          onChange={(e) => handleCodeChange(e.target.value)}
-          disabled={!!sessionEndedMessage}
-          className="flex-1 border rounded-lg p-3 font-mono text-sm"
-          placeholder="Write your solution here..."
-        />
+        <div className="flex-1 border rounded-lg overflow-hidden">
+          <Editor
+            height="100%"
+            language={getEditorLanguage(session.language)}
+            value={code}
+            onChange={(value) => handleCodeChange(value ?? "")}
+            theme="vs-light"
+            options={{
+              readOnly: !!sessionEndedMessage,
+              minimap: { enabled: false },
+              fontSize: 14,
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              lineNumbers: "on",
+              tabSize: 2,
+              insertSpaces: true,
+              bracketPairColorization: { enabled: true },
+              padding: { top: 12 },
+            }}
+          />
+        </div>
 
         <div className="mt-4 flex gap-3">
           {!sessionEndedMessage ? (
@@ -347,25 +587,51 @@ export default function CollaborationRoom({
           ) : (
             <button
               onClick={onLeave}
-              className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              className="bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700"
             >
               Back to Matching
             </button>
           )}
         </div>
 
-        <div className="mt-3 text-xs text-slate-500">
-          <p>Partner joined: {partnerJoined ? "Yes" : "Not yet"}</p>
-          <p>Partner disconnected: {partnerDisconnected ? "Yes" : "No"}</p>
+        <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+          <span
+            className={`inline-block h-2.5 w-2.5 rounded-full ${
+              partnerConnected
+                ? "bg-green-500"
+                : partnerName
+                  ? "bg-red-500"
+                  : "bg-slate-300"
+            }`}
+          />
+          <span>
+            Partner:{" "}
+            <strong>
+              {partnerName || "Waiting for partner..."}
+            </strong>
+          </span>
         </div>
       </div>
 
-      <ChatPanel
-        sessionId={session.session_id}
-        userId={userId}
-        username={username}
-        disabled={!!sessionEndedMessage}
-      />
+      {isChatOpen && (
+        <Chat
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          remainingPrompts={remainingPrompts}
+          promptCountLoading={promptCountLoading}
+          aiChatMessages={aiChatMessages}
+          aiChatHistoryLoading={aiChatHistoryLoading}
+          appendAiChatMessage={appendAiChatMessage}
+          onSendAiChatPrompt={handleSendAiChatPrompt}
+          onAiChatMessageSent={() => {
+            void refreshRemainingPrompts(false);
+          }}
+          remainingRequests={remainingRequests}
+          loading={loading}
+          handleAIRequest={handleAIRequest}
+          aiResponse={aiResponse}
+        />
+      )}
     </div>
   );
 }
