@@ -7,7 +7,10 @@ import type { Session } from "../services/collaborationService";
 import type { Question } from "../services/questionService";
 import { getAiExplanation, getRemainingRequests } from "../services/aiExplanationsService";
 import type { AIExplanationType } from "../services/aiExplanationsService";
-import { getRemainingPromptCount } from "../services/aiChatService";
+import {
+  getRemainingPromptCount,
+  sendPromptToAiChat,
+} from "../services/aiChatService";
 
 const COLLAB_SERVER_URL =
   import.meta.env.VITE_COLLAB_SERVICE_URL || "http://localhost:3003";
@@ -396,6 +399,12 @@ export default function CollaborationRoom({
   }
 }
 
+  async function handleSendAiChatPrompt(prompt: string): Promise<string> {
+    const data = await sendPromptToAiChat(session.session_id, userId, prompt);
+    void refreshRemainingPrompts(false);
+    return data.response;
+  }
+
   return (
     <div
       className={`grid gap-6 h-[80vh] min-h-0 ${
@@ -580,6 +589,7 @@ export default function CollaborationRoom({
           setActiveTab={setActiveTab}
           remainingPrompts={remainingPrompts}
           promptCountLoading={promptCountLoading}
+          onSendAiChatPrompt={handleSendAiChatPrompt}
           onAiChatMessageSent={() => {
             void refreshRemainingPrompts(false);
           }}

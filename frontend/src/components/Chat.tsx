@@ -8,6 +8,7 @@ type Props = {
   setActiveTab: (tab: TabType) => void;
   remainingPrompts: number | null;
   promptCountLoading: boolean;
+  onSendAiChatPrompt: (prompt: string) => Promise<string>;
   onAiChatMessageSent: () => void;
   remainingRequests: number | null;
   loading: boolean;
@@ -20,17 +21,24 @@ export default function Chat({
   setActiveTab,
   remainingPrompts,
   promptCountLoading,
+  onSendAiChatPrompt,
   onAiChatMessageSent,
   remainingRequests,
   loading,
   handleAIRequest,
   aiResponse,
 }: Props) {
+  type AiChatMessage = {
+    role: "user" | "assistant";
+    content: string;
+  };
+
   const MAX_PROMPTS = 15;
   const [promptsLeft, setPromptsLeft] = useState<number>(MAX_PROMPTS);
   const [isUsingBackendCount, setIsUsingBackendCount] = useState(false);
+  const [sendingAiChat, setSendingAiChat] = useState(false);
   const [aiChatInput, setAiChatInput] = useState("");
-  const [aiChatMessages, setAiChatMessages] = useState<string[]>([]);
+  const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
 
   useEffect(() => {
     if (typeof remainingPrompts === "number") {
@@ -44,18 +52,35 @@ export default function Chat({
     }
   }, [remainingPrompts, promptCountLoading]);
 
-  function sendAiChatMessage() {
+  async function sendAiChatMessage() {
     const trimmed = aiChatInput.trim();
-    if (!trimmed || promptsLeft <= 0) return;
+    if (!trimmed || promptsLeft <= 0 || sendingAiChat) return;
 
-    setAiChatMessages((prev) => [...prev, trimmed]);
+    setAiChatMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setAiChatInput("");
     // Fallback for prompt count in case backend count not avail
     if (!isUsingBackendCount) {
       setPromptsLeft((prev) => Math.max(0, prev - 1));
     }
 
-    onAiChatMessageSent();
+    try {
+      setSendingAiChat(true);
+      const response = await onSendAiChatPrompt(trimmed);
+      setAiChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response },
+      ]);
+      onAiChatMessageSent();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to get AI response.";
+      setAiChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: errorMessage },
+      ]);
+    } finally {
+      setSendingAiChat(false);
+    }
   }
 
   return (
@@ -110,13 +135,20 @@ export default function Chat({
               <p className="text-slate-500">Send a prompt to start chatting with AI.</p>
             ) : (
               aiChatMessages.map((message, index) => (
-                <div key={index} className="flex justify-end">
-                  <div className="max-w-[85%] rounded-lg bg-indigo-100 px-3 py-2 text-indigo-900 whitespace-pre-wrap">
-                    {message}
+                message.role === "user" ? (
+                  <div key={index} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-lg bg-indigo-100 px-3 py-2 text-indigo-900 whitespace-pre-wrap">
+                      {message.content}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <p key={index} className="text-slate-700 whitespace-pre-wrap">
+                    {message.content}
+                  </p>
+                )
               ))
             )}
+            {sendingAiChat && <p className="text-slate-500">Thinking...</p>}
           </div>
 
           <div className="mt-3 flex items-center gap-2">
@@ -126,7 +158,7 @@ export default function Chat({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  sendAiChatMessage();
+                  void sendAiChatMessage();
                 }
               }}
               placeholder="Ask AI for guidance..."
@@ -134,10 +166,12 @@ export default function Chat({
               className="flex-1 resize-none rounded-lg border border-slate-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             />
             <button
-              onClick={sendAiChatMessage}
-              disabled={promptsLeft === 0 || aiChatInput.trim().length === 0}
+              onClick={() => {
+                void sendAiChatMessage();
+              }}
+              disabled={sendingAiChat || promptsLeft === 0 || aiChatInput.trim().length === 0}
               className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${
-                promptsLeft === 0 || aiChatInput.trim().length === 0
+                sendingAiChat || promptsLeft === 0 || aiChatInput.trim().length === 0
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}

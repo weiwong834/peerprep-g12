@@ -3,24 +3,26 @@ const API_BASE =
 
 type RequestOptions = RequestInit & {
   headers?: Record<string, string>;
+  timeoutMs?: number;
 };
 
 async function authFetch<T>(
   url: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  const { timeoutMs = 5000, ...requestOptions } = options;
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   const token = localStorage.getItem("accessToken");
 
   try {
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
+        ...(requestOptions.headers || {}),
       },
     });
 
@@ -65,4 +67,22 @@ export async function getRemainingPromptCount(
       remainingRequests: data.remainingRequests,
     };
   });
+}
+
+export async function sendPromptToAiChat(
+  sessionId: string,
+  userId: string,
+  prompt: string,
+) {
+  return authFetch<{ response: string }>(
+    `${API_BASE}/sessions/${sessionId}/chat`,
+    {
+      method: "POST",
+      timeoutMs: Number(import.meta.env.VITE_AI_CHAT_TIMEOUT_MS ?? 60000),
+      body: JSON.stringify({
+        userId,
+        prompt,
+      }),
+    },
+  );
 }
