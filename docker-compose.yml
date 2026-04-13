@@ -53,7 +53,7 @@ services:
       - USER_SERVICE_URL=http://user-service:3000
       - QUESTION_SERVICE_URL=http://question-service:3001
       - MATCHING_SERVICE_URL=http://matching-service:3002
-      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - RABBITMQ_URL=amqp://rabbitmq:5672
       - REDIS_URL=redis://redis:6379
     depends_on:
       - redis
@@ -92,3 +92,19 @@ services:
       - REDIS_HOST=redis
     depends_on:
       - redis
+
+  ai-chat-service:
+    build: ./ai-chat-service
+    ports:
+      - "3005:3005"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - QUESTION_SERVICE_URL=http://question-service:3001
+      - COLLABORATION_SERVICE_URL=http://collaboration-service:3003
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      - redis
+      - collaboration-service
+      - question-service
