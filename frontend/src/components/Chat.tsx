@@ -1,7 +1,7 @@
 /*
 AI Assistance Disclosure:
 Tool: ChatGPT (model: GPT-5.3-Codex), date: 2026‐04-13
-Scope: Generated tailwind CSS utility classes according to requested aesthetic preferences.
+Scope: Generated tailwind CSS utility classes for AI chat tab according to requested aesthetic preferences.
 Author review: Provide instructions for UI design, adjusted output where necessary.
 */
 
