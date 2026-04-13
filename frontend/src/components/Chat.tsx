@@ -9,11 +9,16 @@ import { useEffect, useRef, useState } from "react";
 import { AcademicCapIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ChatPanel from "./ChatPanel";
 import type { AIExplanationType } from "../services/aiExplanationsService";
 
 type TabType = "Partner Chat" | "AI Chat" | "AI Explanations";
 
 type Props = {
+  sessionId: string;
+  userId: string;
+  username: string;
+  partnerChatDisabled?: boolean;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   remainingPrompts: number | null;
@@ -33,6 +38,10 @@ type Props = {
 };
 
 export default function Chat({
+  sessionId,
+  userId,
+  username,
+  partnerChatDisabled,
   activeTab,
   setActiveTab,
   remainingPrompts,
@@ -157,7 +166,14 @@ export default function Chat({
         </button>
       </div>
 
-      {/* {activeTab === "Partner Chat" */}
+      {activeTab === "Partner Chat" && (
+        <ChatPanel
+          sessionId={sessionId}
+          userId={userId}
+          username={username}
+          disabled={partnerChatDisabled}
+        />
+      )}
 
       {activeTab === "AI Chat" && (
         <>

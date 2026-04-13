@@ -71,11 +71,10 @@ export default function ChatPanel({ sessionId, userId, username, disabled }: Pro
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col h-full">
-      <h2 className="text-lg font-semibold mb-3">
-        Chat {!connected && <span className="text-xs text-red-400">(connecting...)</span>}
-      </h2>
-
       <div className="flex-1 overflow-y-auto space-y-2 mb-3 text-sm">
+        {!connected && (
+          <p className="text-xs text-red-400">Connecting...</p>
+        )}
         {messages.length === 0 && (
           <p className="text-slate-400 text-xs">No messages yet.</p>
         )}

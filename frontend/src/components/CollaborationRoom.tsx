@@ -603,6 +603,10 @@ export default function CollaborationRoom({
 
       {isChatOpen && (
         <Chat
+          sessionId={session.session_id}
+          userId={userId}
+          username={currentUsername}
+          partnerChatDisabled={!!sessionEndedMessage}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           remainingPrompts={remainingPrompts}
