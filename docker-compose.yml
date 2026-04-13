@@ -82,6 +82,24 @@ services:
     depends_on:
       - user-service
   
+  chat-service:
+    build: ./chat-service
+    ports:
+      - "3004:3004"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USER_SERVICE_URL=http://user-service:3000
+      - COLLAB_SERVICE_URL=http://collaboration-service:3003
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+    depends_on:
+      - redis
+      - rabbitmq
+    restart: always
+  
   ai-explanations-service:
     build: ./ai-explanations-service
     ports:
