@@ -10,6 +10,12 @@ type Props = {
   setActiveTab: (tab: TabType) => void;
   remainingPrompts: number | null;
   promptCountLoading: boolean;
+  aiChatMessages: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
+  aiChatHistoryLoading: boolean;
+  appendAiChatMessage: (message: { role: "user" | "assistant"; content: string }) => void;
   onSendAiChatPrompt: (prompt: string) => Promise<string>;
   onAiChatMessageSent: () => void;
   remainingRequests: number | null;
@@ -23,6 +29,9 @@ export default function Chat({
   setActiveTab,
   remainingPrompts,
   promptCountLoading,
+  aiChatMessages,
+  aiChatHistoryLoading,
+  appendAiChatMessage,
   onSendAiChatPrompt,
   onAiChatMessageSent,
   remainingRequests,
@@ -30,17 +39,11 @@ export default function Chat({
   handleAIRequest,
   aiResponse,
 }: Props) {
-  type AiChatMessage = {
-    role: "user" | "assistant";
-    content: string;
-  };
-
   const MAX_PROMPTS = 15;
   const [promptsLeft, setPromptsLeft] = useState<number>(MAX_PROMPTS);
   const [isUsingBackendCount, setIsUsingBackendCount] = useState(false);
   const [sendingAiChat, setSendingAiChat] = useState(false);
   const [aiChatInput, setAiChatInput] = useState("");
-  const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
 
   useEffect(() => {
     if (typeof remainingPrompts === "number") {
@@ -58,7 +61,7 @@ export default function Chat({
     const trimmed = aiChatInput.trim();
     if (!trimmed || promptsLeft <= 0 || sendingAiChat) return;
 
-    setAiChatMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    appendAiChatMessage({ role: "user", content: trimmed });
     setAiChatInput("");
     // Fallback for prompt count in case backend count not avail
     if (!isUsingBackendCount) {
@@ -68,18 +71,12 @@ export default function Chat({
     try {
       setSendingAiChat(true);
       const response = await onSendAiChatPrompt(trimmed);
-      setAiChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: response },
-      ]);
+      appendAiChatMessage({ role: "assistant", content: response });
       onAiChatMessageSent();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to get AI response.";
-      setAiChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: errorMessage },
-      ]);
+      appendAiChatMessage({ role: "assistant", content: errorMessage });
     } finally {
       setSendingAiChat(false);
     }
@@ -133,7 +130,9 @@ export default function Chat({
           </div>
 
           <div className="flex-1 overflow-y-auto border rounded p-3 text-sm text-slate-700 space-y-2">
-            {aiChatMessages.length === 0 ? (
+            {aiChatHistoryLoading ? (
+              <p className="text-slate-500">Loading chat history...</p>
+            ) : aiChatMessages.length === 0 ? (
               <p className="text-slate-500">Send a prompt to start chatting with AI.</p>
             ) : (
               aiChatMessages.map((message, index) => (

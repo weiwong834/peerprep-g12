@@ -8,6 +8,7 @@ import type { Question } from "../services/questionService";
 import { getAiExplanation, getRemainingRequests } from "../services/aiExplanationsService";
 import type { AIExplanationType } from "../services/aiExplanationsService";
 import {
+  getAiChatHistory,
   getRemainingPromptCount,
   sendPromptToAiChat,
 } from "../services/aiChatService";
@@ -21,6 +22,11 @@ type Props = {
   userId: string;
   username: string;
   onLeave: () => void;
+};
+
+type AiChatMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 export default function CollaborationRoom({
@@ -47,6 +53,8 @@ export default function CollaborationRoom({
   const [earlyTerminationWarning, setEarlyTerminationWarning] = useState("");
   const [canRejoinQueue, setCanRejoinQueue] = useState(false);
   const [aiResponse, setAIResponse] = useState("");
+  const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
+  const [aiChatHistoryLoading, setAiChatHistoryLoading] = useState(true);
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
   const [remainingPrompts, setRemainingPrompts] = useState<number | null>(null);
   const [promptCountLoading, setPromptCountLoading] = useState(true);
@@ -270,6 +278,24 @@ export default function CollaborationRoom({
     fetchRemaining();
   }, [session.session_id, userId]);
 
+  useEffect(() => {
+    async function fetchAiChatHistory() {
+      setAiChatHistoryLoading(true);
+
+      try {
+        const data = await getAiChatHistory(session.session_id, userId);
+        setAiChatMessages(data.messages);
+      } catch (err) {
+        console.error("Failed to fetch AI chat history", err);
+        setAiChatMessages([]);
+      } finally {
+        setAiChatHistoryLoading(false);
+      }
+    }
+
+    fetchAiChatHistory();
+  }, [session.session_id, userId]);
+
   // Poll ai chat service backend to get remaining prompt count every 4 seconds
   const refreshRemainingPrompts = useCallback(
     async (showLoading = false) => {
@@ -403,6 +429,10 @@ export default function CollaborationRoom({
     const data = await sendPromptToAiChat(session.session_id, userId, prompt);
     void refreshRemainingPrompts(false);
     return data.response;
+  }
+
+  function appendAiChatMessage(message: AiChatMessage) {
+    setAiChatMessages((prev) => [...prev, message]);
   }
 
   return (
@@ -589,6 +619,9 @@ export default function CollaborationRoom({
           setActiveTab={setActiveTab}
           remainingPrompts={remainingPrompts}
           promptCountLoading={promptCountLoading}
+          aiChatMessages={aiChatMessages}
+          aiChatHistoryLoading={aiChatHistoryLoading}
+          appendAiChatMessage={appendAiChatMessage}
           onSendAiChatPrompt={handleSendAiChatPrompt}
           onAiChatMessageSent={() => {
             void refreshRemainingPrompts(false);

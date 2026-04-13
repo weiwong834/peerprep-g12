@@ -69,6 +69,23 @@ export async function getRemainingPromptCount(
   });
 }
 
+export async function getAiChatHistory(
+  sessionId: string,
+  userId: string,
+) {
+  return authFetch<{
+    messages: Array<{
+      role: "user" | "assistant";
+      content: string;
+    }>;
+  }>(
+    `${API_BASE}/sessions/${sessionId}/chatHistory?userId=${encodeURIComponent(userId)}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
 export async function sendPromptToAiChat(
   sessionId: string,
   userId: string,
