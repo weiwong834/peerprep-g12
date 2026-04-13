@@ -74,14 +74,6 @@ export async function getRemainingPromptCount(
     const count = Number.isFinite(currentCount) && currentCount > 0 ? currentCount : 0;
     const remainingRequests = Math.max(0, PROMPT_LIMIT - count);
 
-    logger.info("Fetched prompt count", {
-      sessionId,
-      userId,
-      count,
-      limit: PROMPT_LIMIT,
-      remainingRequests,
-    });
-
     return {
       count,
       limit: PROMPT_LIMIT,
