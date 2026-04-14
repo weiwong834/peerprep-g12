@@ -50,7 +50,10 @@ export default function CollaborationRoom({
   const [partnerName, setPartnerName] = useState<string>("");
   const [partnerConnected, setPartnerConnected] = useState(false);
   const [idleWarning, setIdleWarning] = useState("");
+  const [idleCountdown, setIdleCountdown] = useState<number | null>(null);
+  const idleCountdownIntervalRef = useRef<number | null>(null);
   const [sessionEndedMessage, setSessionEndedMessage] = useState("");
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [earlyTerminationWarning, setEarlyTerminationWarning] = useState("");
   const [canRejoinQueue, setCanRejoinQueue] = useState(false);
   const [aiResponse, setAIResponse] = useState("");
@@ -79,6 +82,7 @@ export default function CollaborationRoom({
 
     const handleYTextChange = () => {
       setCode(ytext.toString());
+      clearIdleWarningState();
     };
 
     ytext.observe(handleYTextChange);
@@ -211,13 +215,28 @@ export default function CollaborationRoom({
     });
 
     socket.on("idle-warning", ({ message }: { message: string }) => {
+      clearIdleWarningState();
       setIdleWarning(message);
+      setIdleCountdown(30);
+
+      idleCountdownIntervalRef.current = window.setInterval(() => {
+        setIdleCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            if (idleCountdownIntervalRef.current !== null) {
+              clearInterval(idleCountdownIntervalRef.current);
+              idleCountdownIntervalRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     });
 
     socket.on(
       "session-ended",
       ({ message }: { message: string; endedBy?: string }) => {
-        setIdleWarning("");
+        clearIdleWarningState();
         setSessionEndedMessage(message || "Session ended.");
       },
     );
@@ -235,6 +254,7 @@ export default function CollaborationRoom({
     );
 
     socket.on("yjs-update", ({ update }: { update: number[] }) => {
+      clearIdleWarningState();
       const incoming = new Uint8Array(update);
       Y.applyUpdate(ydoc, incoming, "remote");
     });
@@ -244,6 +264,7 @@ export default function CollaborationRoom({
     });
 
     return () => {
+      clearIdleWarningState();
       if (syncFallbackTimeoutRef.current !== null) {
         clearTimeout(syncFallbackTimeoutRef.current);
         syncFallbackTimeoutRef.current = null;
@@ -363,31 +384,36 @@ export default function CollaborationRoom({
     const current = ytext.toString();
     if (current === nextValue) return;
 
+    clearIdleWarningState();
+
     ydoc.transact(() => {
       ytext.delete(0, current.length);
       ytext.insert(0, nextValue);
     }, "local");
   }
 
+  function clearIdleWarningState() {
+  setIdleWarning("");
+  setIdleCountdown(null);
+
+  if (idleCountdownIntervalRef.current !== null) {
+    clearInterval(idleCountdownIntervalRef.current);
+    idleCountdownIntervalRef.current = null;
+  }
+  }
+
   function handleEndSession() {
     if (sessionEndedMessage) return;
+    setShowEndSessionModal(true);
+  }
 
-    const startedAt = new Date(session.start_timestamp).getTime();
-    const elapsedMs = Date.now() - startedAt;
-    const isEarlyTerminationRisk = elapsedMs < 2 * 60 * 1000;
-
-    const confirmed = window.confirm(
-      isEarlyTerminationRisk
-        ? "Are you sure you want to end this session? Ending within 2 minutes will count as an early termination strike."
-        : "Are you sure you want to end this session?",
-    );
-
-    if (!confirmed) return;
-
+  function confirmEndSession() {
     socketRef.current?.emit("end-session", {
       sessionId: session.session_id,
       userId,
     });
+
+    setShowEndSessionModal(false);
   }
 
   async function handleAIRequest(type: AIExplanationType) {
@@ -435,6 +461,10 @@ export default function CollaborationRoom({
   function appendAiChatMessage(message: AiChatMessage) {
     setAiChatMessages((prev) => [...prev, message]);
   }
+
+  const startedAt = new Date(session.start_timestamp).getTime();
+  const elapsedMs = Date.now() - startedAt;
+  const isEarlyTerminationRisk = elapsedMs < 2 * 60 * 1000;
 
   return (
     <div
@@ -518,9 +548,13 @@ export default function CollaborationRoom({
         )}
 
         {idleWarning && (
-          <p className="mb-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
-            {idleWarning}
-          </p>
+          <div className="mb-2 rounded border border-yellow-200 bg-yellow-50 p-3">
+            <p className="text-sm font-medium text-yellow-800">Idle warning</p>
+            <p className="text-sm text-yellow-700 mt-1">
+              Make a change in the code editor within{" "}
+              <strong>{idleCountdown ?? 30}s</strong> or the session will end.
+            </p>
+          </div>
         )}
 
         {sessionEndedMessage && (
@@ -593,10 +627,7 @@ export default function CollaborationRoom({
             }`}
           />
           <span>
-            Partner:{" "}
-            <strong>
-              {partnerName || "Waiting for partner..."}
-            </strong>
+            Partner: <strong>{partnerName || "Waiting for partner..."}</strong>
           </span>
         </div>
       </div>
@@ -623,6 +654,36 @@ export default function CollaborationRoom({
           handleAIRequest={handleAIRequest}
           aiResponse={aiResponse}
         />
+      )}
+      {showEndSessionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">
+              End session?
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-600">
+              {isEarlyTerminationRisk
+                ? "Ending within 2 minutes will count as an early termination strike."
+                : "Are you sure you want to end this session?"}
+            </p>
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setShowEndSessionModal(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmEndSession}
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600"
+              >
+                End Session
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
