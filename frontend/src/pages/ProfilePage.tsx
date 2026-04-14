@@ -198,7 +198,7 @@ export default function ProfilePage() {
         "A password reset link has been sent to your email. Please check your inbox and spam folder.",
       );
     } catch (err: any) {
-      setPasswordError(err?.message || "Failed to send password reset email.");
+      setPasswordError(err?.message || "Failed to send password reset email. Try again later.");
     } finally {
       setSendingResetEmail(false);
     }

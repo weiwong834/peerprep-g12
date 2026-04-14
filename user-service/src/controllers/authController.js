@@ -39,48 +39,72 @@ import { supabase, supabaseAdmin } from "../services/supabaseClient.js";
  * @param {Response} res - Express response object used to return the registration result.
  */
 export const signup = async (req, res) => {
-  const { username, email, password } = req.body;
+  try {
+    const { username, email, password } = req.body;
 
-  // check for duplicate username
-  const { data: existing } = await supabase
-    .schema("userservice")
-    .from("profiles")
-    .select("id")
-    .eq("username", username)
-    .maybeSingle();
+    // check for duplicate username
+    const { data: existing } = await supabase
+      .schema("userservice")
+      .from("profiles")
+      .select("id")
+      .eq("username", username)
+      .maybeSingle();
 
-  if (existing) {
-    return res.status(400).json({
-      code: "DUPLICATE_USERNAME",
-      message: "Username already taken.",
-    });
-  }
+    if (existing) {
+      return res.status(400).json({
+        code: "DUPLICATE_USERNAME",
+        message: "Username already taken.",
+      });
+    }
 
-  // attempt to add user to database
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: "http://localhost:5173/verified",
-      data: {
-        username: username,
+    // check for duplicate email
+    const { data: existingEmail } = await supabase
+      .schema("userservice")
+      .from("profiles")
+      .select("id")
+      .eq("email", email  )
+      .maybeSingle();
+
+    if (existingEmail) {
+      return res.status(400).json({
+        code: "DUPLICATE_EMAIL",
+        message: "Email already associated with an account.",
+      });
+    }
+
+    // attempt to add user to database
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: "http://localhost:5173/verified",
+        data: {
+          username: username,
+        },
       },
-    },
-  });
+    });
 
-  // error for duplicate username or email
-  if (error) {
-    return res.status(400).json({
-      code: "DUPLICATE_EMAIL",
-      message: "Duplicate email detected.",
+    // error for duplicate field
+    if (error && error.status === 429) {
+      return res.status(429).json({
+        code: "RATE_EXCEEDED",
+        message: "Failed to send confirmation email. Try again later.",
+      });
+    }
+
+    res.status(201).json({
+      code: "SUCCESS",
+      message: "User registered successfully",
+      user: data.user,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      code: "SERVER_ERROR",
+      message: "An unexpected error occurred. Please try again later.",
     });
   }
-
-  res.status(201).json({
-    code: "SUCCESS",
-    message: "User registered successfully",
-    user: data.user,
-  });
 };
 
 /**
@@ -702,7 +726,7 @@ export const requestPasswordReset = async (req, res) => {
   if (error) {
     return res.status(500).json({
       code: "RESET_FAILED",
-      message: "Failed to send reset email",
+      message: "Failed to send reset email. Try again later.",
     });
   }
 
