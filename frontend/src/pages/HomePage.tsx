@@ -10,9 +10,7 @@ export default function HomePage() {
 
         <ul className="list-disc ml-5 text-slate-600 space-y-1">
           <li>in progress</li>
-          <li>creating questions with image</li>
-          <li>matching service integration</li>
-          <li>collab service integration</li>
+          <li>n2h</li>
         </ul>
       </div>
     </div>
