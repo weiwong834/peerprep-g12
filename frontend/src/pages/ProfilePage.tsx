@@ -194,7 +194,8 @@ export default function ProfilePage() {
         "A password reset link has been sent to your email. Please check your inbox and spam folder.",
       );
     } catch (err: any) {
-      setPasswordError(err?.message || "Failed to send password reset email. Try again later.");
+      // Supabase has internal rate limit of 2 emails per hour. Any emails sent beyond that will fail with an error.
+      setPasswordError(err?.message || "Failed to send password reset email due to internal rate limit. Try again later.");
     } finally {
       setSendingResetEmail(false);
     }

@@ -3,7 +3,7 @@ import { handleExplain, getRemainingRequests } from "../controllers/aiController
 
 const router = express.Router();
 
-router.post("/explain", handleExplain);
-router.get("/remaining", getRemainingRequests);
+router.post("/sessions/:sessionId/explain", handleExplain);
+router.get("/sessions/:sessionId/remaining", getRemainingRequests);
 
 export default router;

@@ -29,48 +29,38 @@ async function authFetch<T>(
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error(data?.error || "Unauthorized");
+      throw new Error(data?.message || "Unauthorized");
     }
     throw new Error(JSON.stringify(data));
-    // throw new Error(data?.error || "AI service request failed");
   }
 
   return data;
 }
 
-export async function getRemainingRequests(
-  sessionId: string,
-  userId: string
-) {
+export async function getRemainingRequests(sessionId: string) {
   return authFetch<{ remainingRequests: number }>(
-    `${API_BASE}/ai/remaining?sessionId=${sessionId}&userId=${userId}`,
+    `${API_BASE}/ai/sessions/${sessionId}/remaining`,
     {
       method: "GET",
     }
   );
 }
 
-/**
- * Request AI explanation from backend
- */
 export async function getAiExplanation(
   type: AIExplanationType,
   question: string,
   code: string,
-  sessionId: string,
-  userId: string
+  sessionId: string
 ) {
-  return authFetch<{ 
+  return authFetch<{
     response: string;
     remainingRequests: number;
-   }>(`${API_BASE}/ai/explain`, {
+  }>(`${API_BASE}/ai/sessions/${sessionId}/explain`, {
     method: "POST",
     body: JSON.stringify({
       type,
       question,
       code,
-      sessionId,
-      userId,
     }),
   });
 }

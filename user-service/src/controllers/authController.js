@@ -84,11 +84,11 @@ export const signup = async (req, res) => {
       },
     });
 
-    // error for duplicate field
     if (error && error.status === 429) {
+      // Supabase has internal rate limit of 2 emails per hour. Any emails sent beyond that will fail with an error.
       return res.status(429).json({
         code: "RATE_EXCEEDED",
-        message: "Failed to send confirmation email. Try again later.",
+        message: "Failed to send confirmation email due to internal rate limit. Try again later.",
       });
     }
 
@@ -726,7 +726,7 @@ export const requestPasswordReset = async (req, res) => {
   if (error) {
     return res.status(500).json({
       code: "RESET_FAILED",
-      message: "Failed to send reset email. Try again later.",
+      message: "Failed to send reset email due to internal rate limit. Try again later.",
     });
   }
 

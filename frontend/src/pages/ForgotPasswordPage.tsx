@@ -27,7 +27,8 @@ export default function ForgotPasswordPage() {
       await requestResetPassword(email);
       setSubmitted(true);
     } catch (err: any) {
-      setError(err?.message || "Failed to send reset email. Try again later.");
+      // Supabase has internal rate limit of 2 emails per hour. Any emails sent beyond that will fail with an error.
+      setError(err?.message || "Failed to send reset email due to internal rate limit. Try again later.");
     } finally {
       setSending(false);
     }

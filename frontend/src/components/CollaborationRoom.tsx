@@ -290,7 +290,6 @@ export default function CollaborationRoom({
       try {
         const data = await getRemainingRequests(
           session.session_id,
-          userId
         );
         setRemainingRequests(data.remainingRequests);
       } catch (err) {
@@ -439,7 +438,6 @@ export default function CollaborationRoom({
         fullQuestion,
         code,
         session.session_id,
-        userId,
       );
 
       setAIResponse(data.response);
