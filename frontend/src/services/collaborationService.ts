@@ -63,3 +63,9 @@ export async function endSession(sessionId: string) {
     method: "PATCH",
   });
 }
+
+export async function getPastSessions() {
+  return authFetch<Session[]>(`${API_BASE}/sessions/history`, {
+    method: "GET",
+  });
+}

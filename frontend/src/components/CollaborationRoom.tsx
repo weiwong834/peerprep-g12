@@ -13,6 +13,7 @@ import {
   getRemainingPromptCount,
   sendPromptToAiChat,
 } from "../services/aiChatService";
+import QuestionDisplay from "../components/QuestionDisplay";
 
 const COLLAB_SERVER_URL =
   import.meta.env.VITE_COLLAB_SERVICE_URL || "http://localhost:3003";
@@ -108,7 +109,7 @@ export default function CollaborationRoom({
         sessionId: session.session_id,
         code: ytext.toString(),
       });
-      
+
       socketInstance.emit("save-code", {
         sessionId: session.session_id,
         code: ytext.toString(),
@@ -153,7 +154,7 @@ export default function CollaborationRoom({
       }, 500);
     });
 
-    socket.on("partner-already-present", ({ username }: { username?: string}) => {
+    socket.on("partner-already-present", ({ username }: { username?: string }) => {
       if (username && username !== currentUsername) {
         setPartnerName(username);
       }
@@ -417,40 +418,40 @@ export default function CollaborationRoom({
   }
 
   async function handleAIRequest(type: AIExplanationType) {
-  if (type === "EXPLAIN_CODE" && (!code || code.trim().length === 0)) {
-    setAIResponse("There is no code yet to explain.");
-    return;
-  }
+    if (type === "EXPLAIN_CODE" && (!code || code.trim().length === 0)) {
+      setAIResponse("There is no code yet to explain.");
+      return;
+    }
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const fullQuestion =
-      question.blocks?.length
-        ? question.blocks
+      const fullQuestion =
+        question.blocks?.length
+          ? question.blocks
             .filter((block) => block.block_type === "text")
             .map((block) => block.content)
             .join("\n\n")
-        : question.title;
+          : question.title;
 
-    const data = await getAiExplanation(
-      type,
-      fullQuestion,
-      code,
-      session.session_id,
-      userId,
-    );
+      const data = await getAiExplanation(
+        type,
+        fullQuestion,
+        code,
+        session.session_id,
+        userId,
+      );
 
-    setAIResponse(data.response);
-    setRemainingRequests(data.remainingRequests);
-  } catch (err) {
-    console.log("Error fetching AI explanation:", err);
-    setAIResponse("Error fetching AI response.");
-    
-  } finally {
-    setLoading(false);
+      setAIResponse(data.response);
+      setRemainingRequests(data.remainingRequests);
+    } catch (err) {
+      console.log("Error fetching AI explanation:", err);
+      setAIResponse("Error fetching AI response.");
+
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   async function handleSendAiChatPrompt(prompt: string): Promise<string> {
     const data = await sendPromptToAiChat(session.session_id, userId, prompt);
@@ -492,41 +493,7 @@ export default function CollaborationRoom({
               Session ID: <strong>{session.session_id}</strong>
             </p>
           </div>
-
-          <div className="space-y-4">
-            {question.blocks && question.blocks.length > 0 ? (
-              question.blocks.map((block, index) => {
-                if (block.block_type === "text") {
-                  return (
-                    <pre
-                      key={index}
-                      className="whitespace-pre-wrap text-sm text-slate-700 font-sans"
-                    >
-                      {block.content}
-                    </pre>
-                  );
-                }
-
-                if (block.block_type === "image") {
-                  return (
-                    <div key={index} className="space-y-2">
-                      <img
-                        src={block.content}
-                        alt={`Question image ${index + 1}`}
-                        className="max-w-full rounded-lg border"
-                      />
-                    </div>
-                  );
-                }
-
-                return null;
-              })
-            ) : (
-              <p className="text-sm text-slate-500">
-                No question description available.
-              </p>
-            )}
-          </div>
+          <QuestionDisplay question={question} />
         </div>
 
         <div className="min-w-0 bg-white rounded-xl shadow-sm p-6 flex flex-col min-h-0">
@@ -676,6 +643,7 @@ export default function CollaborationRoom({
             aiResponse={aiResponse}
           />
         )}
+        
         {showEndSessionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">

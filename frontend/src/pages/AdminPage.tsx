@@ -14,6 +14,11 @@ import {
 import { FiCheck, FiChevronDown } from "react-icons/fi";
 import { Listbox } from "@headlessui/react";
 import { getAllUsers, promoteUser } from "../services/userService";
+import QuestionDisplay from "../components/QuestionDisplay";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github.css";
 
 type AdminUser = {
   id: string;
@@ -46,11 +51,10 @@ function CustomDropdown({
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className="relative">
         <Listbox.Button
-          className={`relative w-full rounded-xl border bg-white px-3 py-2.5 pr-10 text-left shadow-sm transition ${
-            disabled
+          className={`relative w-full rounded-xl border bg-white px-3 py-2.5 pr-10 text-left shadow-sm transition ${disabled
               ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
               : "border-slate-300 text-slate-800 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-          }`}
+            }`}
         >
           <span className={selectedOption ? "" : "text-slate-400"}>
             {selectedOption ? selectedOption.label : placeholder}
@@ -67,8 +71,7 @@ function CustomDropdown({
               key={option.value}
               value={option.value}
               className={({ active }) =>
-                `relative cursor-pointer select-none px-4 py-2.5 ${
-                  active ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
+                `relative cursor-pointer select-none px-4 py-2.5 ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
                 }`
               }
             >
@@ -150,38 +153,38 @@ export default function AdminPage() {
   const [confirmingAction, setConfirmingAction] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmText: string;
-  confirmVariant?: "indigo" | "red";
-  onConfirm: (() => Promise<void> | void) | null;
-}>({
-  isOpen: false,
-  title: "",
-  message: "",
-  confirmText: "Confirm",
-  confirmVariant: "indigo",
-  onConfirm: null,
-});
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    confirmVariant?: "indigo" | "red";
+    onConfirm: (() => Promise<void> | void) | null;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    confirmVariant: "indigo",
+    onConfirm: null,
+  });
 
-const topicOptions = [
-  { value: "", label: "All topics" },
-  ...topics.map((topic) => ({ value: topic.name, label: topic.name })),
-];
+  const topicOptions = [
+    { value: "", label: "All topics" },
+    ...topics.map((topic) => ({ value: topic.name, label: topic.name })),
+  ];
 
-const difficultyOptions = [
-  { value: "", label: "All difficulties" },
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
-];
+  const difficultyOptions = [
+    { value: "", label: "All difficulties" },
+    { value: "easy", label: "Easy" },
+    { value: "medium", label: "Medium" },
+    { value: "hard", label: "Hard" },
+  ];
 
-const statusOptions = [
-  { value: "", label: "All statuses" },
-  { value: "available", label: "Available" },
-  { value: "archived", label: "Archived" },
-];
+  const statusOptions = [
+    { value: "", label: "All statuses" },
+    { value: "available", label: "Available" },
+    { value: "archived", label: "Archived" },
+  ];
 
   async function loadTopics() {
     try {
@@ -632,22 +635,20 @@ const statusOptions = [
         <button
           type="button"
           onClick={() => setActiveTab("questions")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-            activeTab === "questions"
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === "questions"
               ? "bg-white text-indigo-600 shadow-sm"
               : "text-slate-600 hover:text-slate-800"
-          }`}
+            }`}
         >
           Question Bank
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("users")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-            activeTab === "users"
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === "users"
               ? "bg-white text-indigo-600 shadow-sm"
               : "text-slate-600 hover:text-slate-800"
-          }`}
+            }`}
         >
           User Management
         </button>
@@ -781,11 +782,10 @@ const statusOptions = [
                             setCreateError("");
                             setCreateMessage("");
                           }}
-                          className={`rounded-full px-3 py-1 text-sm transition ${
-                            selected
+                          className={`rounded-full px-3 py-1 text-sm transition ${selected
                               ? "bg-indigo-600 text-white"
                               : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                          }`}
+                            }`}
                         >
                           {topic.name}
                         </button>
@@ -921,57 +921,57 @@ const statusOptions = [
                                 <div className="absolute right-0 z-10 mt-2 w-48 rounded-lg border border-slate-200 bg-white shadow-lg">
                                   {question.availability_status ===
                                     "available" && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => startEditing(question)}
-                                        className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                                      >
-                                        Edit Question
-                                      </button>
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => startEditing(question)}
+                                          className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                          Edit Question
+                                        </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleArchiveQuestion(
-                                            question.question_number,
-                                          )
-                                        }
-                                        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
-                                      >
-                                        Archive Question
-                                      </button>
-                                    </>
-                                  )}
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleArchiveQuestion(
+                                              question.question_number,
+                                            )
+                                          }
+                                          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
+                                        >
+                                          Archive Question
+                                        </button>
+                                      </>
+                                    )}
 
                                   {question.availability_status ===
                                     "archived" && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRestoreQuestion(
-                                            question.question_number,
-                                          )
-                                        }
-                                        className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                                      >
-                                        Restore Question
-                                      </button>
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRestoreQuestion(
+                                              question.question_number,
+                                            )
+                                          }
+                                          className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                                        >
+                                          Restore Question
+                                        </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleDeleteQuestion(
-                                            question.question_number,
-                                          )
-                                        }
-                                        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
-                                      >
-                                        Delete Question
-                                      </button>
-                                    </>
-                                  )}
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleDeleteQuestion(
+                                              question.question_number,
+                                            )
+                                          }
+                                          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
+                                        >
+                                          Delete Question
+                                        </button>
+                                      </>
+                                    )}
                                 </div>
                               )}
                             </div>
@@ -980,6 +980,33 @@ const statusOptions = [
 
                         <div className="mt-3 space-y-4 text-sm text-slate-600">
                           {isExpanded ? (
+                            <QuestionDisplay question={question} showTitle={false} />
+                          ) : (
+                            <div className="text-sm text-slate-600">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={{
+                                  code({ className, children, ...props }) {
+                                    const isInline = !className;
+                                    return isInline ? (
+                                      <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                                        {children}
+                                      </code>
+                                    ) : (
+                                      <code className={className} {...props}>{children}</code>
+                                    );
+                                  },
+                                }}
+                              >
+                                {(() => {
+                                  const preview = getQuestionTextPreview(question);
+                                  return preview.length > 220 ? `${preview.slice(0, 220)}...` : preview;
+                                })()}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                          {/* {isExpanded ? (
                             (question.blocks ?? []).map((block, index) => {
                               if (block.block_type === "image") {
                                 return (
@@ -1024,7 +1051,7 @@ const statusOptions = [
                                   : preview;
                               })()}
                             </p>
-                          )}
+                          )} */}
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -1116,11 +1143,10 @@ const statusOptions = [
                                         setEditError("");
                                         setEditMessage("");
                                       }}
-                                      className={`rounded-full px-3 py-1 text-sm transition ${
-                                        selected
+                                      className={`rounded-full px-3 py-1 text-sm transition ${selected
                                           ? "bg-indigo-600 text-white"
                                           : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                      }`}
+                                        }`}
                                     >
                                       {topic.name}
                                     </button>
@@ -1257,11 +1283,10 @@ const statusOptions = [
 
                       <div className="flex items-center gap-3">
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            user.isAdmin
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${user.isAdmin
                               ? "bg-green-100 text-green-700"
                               : "bg-slate-200 text-slate-700"
-                          }`}
+                            }`}
                         >
                           {user.isAdmin ? "Admin" : "User"}
                         </span>
@@ -1312,11 +1337,10 @@ const statusOptions = [
                 type="button"
                 onClick={handleConfirmModalAction}
                 disabled={confirmingAction}
-                className={`w-full rounded-xl px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60 ${
-                  confirmModal.confirmVariant === "red"
+                className={`w-full rounded-xl px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60 ${confirmModal.confirmVariant === "red"
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
+                  }`}
               >
                 {confirmingAction ? "Processing..." : confirmModal.confirmText}
               </button>

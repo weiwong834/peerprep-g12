@@ -10,6 +10,7 @@ import ProfilePage from "../pages/ProfilePage";
 import CollaborationPage from "../pages/CollabPage";
 import AdminPage from "../pages/AdminPage";
 import VerifiedPage from "../pages/VerifiedPage";
+import AttemptHistoryPage from "../pages/AttemptHistoryPage";
 
 import AppLayout from "../components/layout/AppLayout";
 
@@ -70,6 +71,7 @@ export default function AppRoutes() {
           }
         >
           <Route path="/home" element={<HomePage />} />
+          <Route path="/attempt/:sessionId" element={<AttemptHistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/collab" element={<CollaborationPage />} />
           <Route
