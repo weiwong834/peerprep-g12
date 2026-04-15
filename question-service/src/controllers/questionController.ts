@@ -1,5 +1,11 @@
 import { supabase } from "../supabaseClient";
 import { Request, Response } from "express";
+import crypto from 'crypto';
+
+//used for image upload
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 /**
  * Fetches and attaches ordered blocks to an array of question objects.
@@ -113,8 +119,8 @@ export async function getAllQuestions(req: Request, res: Response) {
   //if filtered by topic
   const filtered = topic
     ? data.filter((q: any) =>
-        q.question_topics.some((qt: any) => qt.topic === topic),
-      )
+      q.question_topics.some((qt: any) => qt.topic === topic),
+    )
     : data;
 
   //Attach blocks to all questions in. one batched query
@@ -574,4 +580,40 @@ export async function deleteQuestion(req: Request, res: Response) {
   if (error) return res.status(500).json({ error: error.message });
 
   return res.status(204).send();
+}
+
+/**
+ * Uploads an image to Supabase Storage and returns the public URL. 
+ * Used by the admin frontend when inserting images into question descriptions. 
+ * 
+ * @route POST /questions/images/upload 
+ * @access Admin only
+ * @body multipart/form-data with field "image"
+ * @return {Object} { url: string }
+ */
+export async function uploadQuestionImage(req: MulterRequest, res: Response) {
+  if (!req.file) {
+    return res.status(400).json({ error: "No image file provided." });
+  }
+
+  const ext = req.file.originalname.split(".").pop() ?? "png";
+  //give random uuid to prevent collisions if two files of the same name are uploaded.
+  const filename = `${crypto.randomUUID()}.${ext}`;
+  const path = `questions/${filename}`;
+
+  const { error } = await supabase
+    .storage
+    .from("question-images")
+    .upload(path, req.file.buffer, {
+      contentType: req.file.mimetype,
+    });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const { data } = supabase
+    .storage
+    .from("question-images")
+    .getPublicUrl(path);
+
+  return res.status(200).json({ url: data.publicUrl });
 }

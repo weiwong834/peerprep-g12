@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import multer from "multer";
+
 import {
     getAllQuestions,
     getQuestionByNumber,
@@ -9,10 +11,13 @@ import {
     restoreQuestion,
     deleteQuestion,
     getQuestionById,
+    uploadQuestionImage
 } from '../controllers/questionController';
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
+router.post("/images/upload", requireAuth, requireAdmin, upload.single("image"), uploadQuestionImage);
 router.get('/', requireAuth, requireAdmin, getAllQuestions);
 router.get("/id/:questionId", requireAuth, getQuestionById);
 router.get('/:questionNumber', requireAuth, requireAdmin, getQuestionByNumber);
