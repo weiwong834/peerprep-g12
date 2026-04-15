@@ -2,6 +2,8 @@ import csv
 import json 
 from collections import defaultdict
 
+# this file was generated using Claude AI 
+
 topic_map = {
     'Array' : 'Arrays',
     'Sort' : 'Sorting',

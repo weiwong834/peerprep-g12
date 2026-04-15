@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { Request, Response, NextFunction } from 'express';
 
+// this file is modified from Claude AI 
+
 type UserProfile = {
     id: string;
-    username: string; 
+    username: string;
     email: string;
     isAdmin: boolean;
 };
