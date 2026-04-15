@@ -69,19 +69,21 @@ services:
     image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
-      
+
   question-service:
     build: ./question-service
-    ports: 
+    ports:
       - "3001:3001"
-    environment: 
+    env_file:
+      - ./question-service/.env
+    environment:
       - USER_SERVICE_URL=http://user-service:3000
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     depends_on:
       - user-service
-  
+
   chat-service:
     build: ./chat-service
     ports:
@@ -99,7 +101,7 @@ services:
       - redis
       - rabbitmq
     restart: always
-  
+
   ai-explanations-service:
     build: ./ai-explanations-service
     ports:
