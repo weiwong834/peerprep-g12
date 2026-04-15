@@ -143,3 +143,65 @@ Output Summary: chatService.ts (Socket.IO connection helper), ChatPanel.tsx (aut
 Action Taken: Modified
 
 Author Notes: Component structure and event names were maintained but styling was adjusted to match existing frontend conventions.
+
+
+---
+### Frontend
+
+#### Disclosure 1
+
+Date/Time: 11 Mar 2026
+
+Tool: Chatgpt (GPT-5.4)
+
+Prompt/Command: Given project summary and the basic idea of the potential implementation of the app, suggest the techstack and how I should kickstart this app, provide comparison where possible
+
+Output Summary: A comparison between Vite, Next.js, Create React App and suggested to use Vite for simpler implementation and speed. It also provided a skeleton frontend folder structure, and starting code to visualise the app.
+
+Action Taken: Taken and modified suggestion
+
+Author Notes: Suggestions were taken and skeleton code was modified to match desired implementation
+
+#
+#### Disclosure 2
+
+Date/Time: 18 Mar 2026
+
+Tool: Chatgpt (GPT-5.4)
+
+Prompt/Command: For the frontend implementation in the admin page, admins will be able to view the full list of questions, I would like to display each question in a question card with relevant information tagged within the card. Can you suggest an implementation.
+
+Output Summary: Provided different output choices for question card, highlighting the pros of better formatting within the card, for clarity
+
+Action Taken: Taken and modified suggestion
+
+Author Notes: The flow of the question card was used, however fixed some rendering and implemented additional feature to question card by making it expandable
+
+#### Disclosure 3
+
+Date/Time: 14 Apr 2026
+
+Tool: Chatgpt (GPT-5.4)
+
+Prompt/Command: Currently building the collaboration room. It has Monaco editor, socket events, idle warning, end session modal, AI explanation/partner chat panel. The idea is 3 panels: question on the left followed by editor, followed by collapsible chat panel with 3 tabs. However the format is getting messy and mainly page overflowing issues, can you suggest some fixes
+
+Output Summary: Suggested formatting and layout changes to improve page structure and handle overflow issues more cleanly, while preserving the existing collaboration room logic and features.
+
+Action Taken: Taken and modified suggestion
+
+Author Notes: The formatting suggestions were reviewed, adjusted, and tested before being incorporated into the final CollaborationRoom component.
+
+#
+#### Disclosure 4
+
+Date/Time: 14 Apr 2026
+
+Tool: Chatgpt (GPT-5.4)
+
+Prompt/Command: Working on CollagPage where users select topic, difficulty and language then connect to matching service through sockets. Can you debug the modal and error cases, the network error isn't displayed properly in a pop up and the modal format is messed up too.
+
+Output Summary: Provided suggestings for error handling, and general debugginf for the UI
+
+Action Taken: Taken and modified suggestion
+
+Author Notes: The suggested logic and UI flow ideas were reviewed, adapted, and tested before being integrated, with further modifications made to fit the project’s actual matching flow.
