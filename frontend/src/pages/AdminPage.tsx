@@ -1,3 +1,4 @@
+// This styling/formatting for the question card was created with the help of chatgpt-5.4
 import { useEffect, useMemo, useState } from "react";
 import {
   archiveQuestion,

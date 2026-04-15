@@ -1,3 +1,4 @@
+// This file was created with the help of chatgpt-5.4, ai was used to help with formatting edits and debugging
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
 import { io, type Socket } from "socket.io-client";
@@ -6,7 +7,10 @@ import Editor from "@monaco-editor/react";
 import Chat from "./Chat";
 import type { Session } from "../services/collaborationService";
 import type { Question } from "../services/questionService";
-import { getAiExplanation, getRemainingRequests } from "../services/aiExplanationsService";
+import {
+  getAiExplanation,
+  getRemainingRequests,
+} from "../services/aiExplanationsService";
 import type { AIExplanationType } from "../services/aiExplanationsService";
 import {
   getAiChatHistory,
@@ -60,7 +64,9 @@ export default function CollaborationRoom({
   const [aiResponse, setAIResponse] = useState("");
   const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
   const [aiChatHistoryLoading, setAiChatHistoryLoading] = useState(true);
-  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(
+    null,
+  );
   const [remainingPrompts, setRemainingPrompts] = useState<number | null>(null);
   const [promptCountLoading, setPromptCountLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -154,13 +160,16 @@ export default function CollaborationRoom({
       }, 500);
     });
 
-    socket.on("partner-already-present", ({ username }: { username?: string }) => {
-      if (username && username !== currentUsername) {
-        setPartnerName(username);
-      }
-      setPartnerConnected(true);
-      setRoomMessage("");
-    });
+    socket.on(
+      "partner-already-present",
+      ({ username }: { username?: string }) => {
+        if (username && username !== currentUsername) {
+          setPartnerName(username);
+        }
+        setPartnerConnected(true);
+        setRoomMessage("");
+      },
+    );
 
     socket.on("code-restored", ({ code }: { code: string }) => {
       if (!code) return;
@@ -326,10 +335,7 @@ export default function CollaborationRoom({
       }
 
       try {
-        const data = await getRemainingPromptCount(
-          session.session_id,
-          userId,
-        );
+        const data = await getRemainingPromptCount(session.session_id, userId);
         setRemainingPrompts(data.remainingRequests);
       } catch (err) {
         console.error("Failed to fetch remaining prompts", err);
@@ -393,13 +399,13 @@ export default function CollaborationRoom({
   }
 
   function clearIdleWarningState() {
-  setIdleWarning("");
-  setIdleCountdown(null);
+    setIdleWarning("");
+    setIdleCountdown(null);
 
-  if (idleCountdownIntervalRef.current !== null) {
-    clearInterval(idleCountdownIntervalRef.current);
-    idleCountdownIntervalRef.current = null;
-  }
+    if (idleCountdownIntervalRef.current !== null) {
+      clearInterval(idleCountdownIntervalRef.current);
+      idleCountdownIntervalRef.current = null;
+    }
   }
 
   function handleEndSession() {
@@ -425,13 +431,12 @@ export default function CollaborationRoom({
     try {
       setLoading(true);
 
-      const fullQuestion =
-        question.blocks?.length
-          ? question.blocks
+      const fullQuestion = question.blocks?.length
+        ? question.blocks
             .filter((block) => block.block_type === "text")
             .map((block) => block.content)
             .join("\n\n")
-          : question.title;
+        : question.title;
 
       const data = await getAiExplanation(
         type,
@@ -445,7 +450,6 @@ export default function CollaborationRoom({
     } catch (err) {
       console.log("Error fetching AI explanation:", err);
       setAIResponse("Error fetching AI response.");
-
     } finally {
       setLoading(false);
     }
@@ -469,9 +473,7 @@ export default function CollaborationRoom({
     <div className="h-[calc(100dvh-4rem)] overflow-x-auto overflow-y-hidden">
       <div
         className={`grid h-full w-full gap-3 ${
-          isChatOpen
-            ? "min-w-[900px] grid-cols-3"
-            : "min-w-[640px] grid-cols-2"
+          isChatOpen ? "min-w-[900px] grid-cols-3" : "min-w-[640px] grid-cols-2"
         }`}
       >
         <div className="min-w-0 bg-white rounded-xl shadow-sm p-6 overflow-auto">
@@ -641,7 +643,7 @@ export default function CollaborationRoom({
             aiResponse={aiResponse}
           />
         )}
-        
+
         {showEndSessionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">

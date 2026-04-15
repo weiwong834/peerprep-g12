@@ -68,9 +68,19 @@ export default function HomePage() {
         </p>
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <h2 className="text-lg font-semibold mb-2">Get Started</h2>
-          <p className="text-slate-600 text-sm">
-            Head to the <strong>Collab</strong> tab to find a match and start a session.
-          </p>
+          <div className="space-y-3 text-slate-600 text-sm">
+            <p>
+              PeerPrep is a collaborative coding interview practice platform
+              where users can match with peers and solve technical interview
+              questions togSether. We hope to be part of your interview
+              preparation, making it more interactive, realistic and accessible.
+            </p>
+
+            <p>
+              Head to the <strong>Collab</strong> tab to find a match and start
+              a session.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -92,7 +102,9 @@ export default function HomePage() {
 
         {!loading && !error && attempts.length === 0 && (
           <div className="bg-white p-4 rounded-xl shadow-sm">
-            <p className="text-slate-500 text-sm">No past sessions yet. Start a session to see your history here.</p>
+            <p className="text-slate-500 text-sm">
+              No past sessions yet. Start a session to see your history here.
+            </p>
           </div>
         )}
 
@@ -108,30 +120,45 @@ export default function HomePage() {
                   <p className="font-medium text-sm text-slate-800 leading-snug">
                     {question?.title ?? "Question unavailable"}
                   </p>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${getDifficultyColor(session.difficulty)}`}>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${getDifficultyColor(session.difficulty)}`}
+                  >
                     {session.difficulty}
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-500 mb-1">
-                  Topic: <span className="font-medium text-slate-700">{session.topic}</span>
+                  Topic:{" "}
+                  <span className="font-medium text-slate-700">
+                    {session.topic}
+                  </span>
                 </p>
                 <p className="text-xs text-slate-500 mb-1">
-                  Language: <span className="font-medium text-slate-700">{session.language}</span>
+                  Language:{" "}
+                  <span className="font-medium text-slate-700">
+                    {session.language}
+                  </span>
                 </p>
                 <p className="text-xs text-slate-500 mb-1">
-                  Duration: <span className="font-medium text-slate-700">
+                  Duration:{" "}
+                  <span className="font-medium text-slate-700">
                     {session.end_timestamp
-                      ? getDuration(session.start_timestamp, session.end_timestamp)
+                      ? getDuration(
+                          session.start_timestamp,
+                          session.end_timestamp,
+                        )
                       : "—"}
                   </span>
                 </p>
                 <p className="text-xs text-slate-400 mt-2">
-                  {new Date(session.start_timestamp).toLocaleDateString("en-SG", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {new Date(session.start_timestamp).toLocaleDateString(
+                    "en-SG",
+                    {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    },
+                  )}
                 </p>
               </div>
             ))}

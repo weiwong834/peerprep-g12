@@ -1,3 +1,4 @@
+// This file was created with the help of chatgpt-5.4, ai was used to help with formatting edits and debugging
 import React, { useEffect, useRef, useState } from "react";
 import { MdOutlineDataArray } from "react-icons/md";
 import { VscSymbolString } from "react-icons/vsc";
