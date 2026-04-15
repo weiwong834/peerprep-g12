@@ -1,4 +1,7 @@
-// This styling/formatting for the question card was created with the help of chatgpt-5.4
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT-5.4 Thinking), date: 2026-03-18
+// Scope: Assisted with the styling and formatting of the question card layout in the Question Bank view
+// Author review: I reviewed, modified, and tested the suggested changes before incorporating them into the file.
 import { useEffect, useMemo, useState } from "react";
 import {
   archiveQuestion,
@@ -53,10 +56,11 @@ function CustomDropdown({
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className="relative">
         <Listbox.Button
-          className={`relative w-full rounded-xl border bg-white px-3 py-2.5 pr-10 text-left shadow-sm transition ${disabled
-            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-            : "border-slate-300 text-slate-800 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-            }`}
+          className={`relative w-full rounded-xl border bg-white px-3 py-2.5 pr-10 text-left shadow-sm transition ${
+            disabled
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+              : "border-slate-300 text-slate-800 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+          }`}
         >
           <span className={selectedOption ? "" : "text-slate-400"}>
             {selectedOption ? selectedOption.label : placeholder}
@@ -73,7 +77,8 @@ function CustomDropdown({
               key={option.value}
               value={option.value}
               className={({ active }) =>
-                `relative cursor-pointer select-none px-4 py-2.5 ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
+                `relative cursor-pointer select-none px-4 py-2.5 ${
+                  active ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
                 }`
               }
             >
@@ -422,7 +427,9 @@ export default function AdminPage() {
   function getQuestionPreview(question: Question) {
     return (question.blocks ?? [])
       .map((block) =>
-        block.block_type === "image" ? `[image:${block.content}]` : block.content,
+        block.block_type === "image"
+          ? `[image:${block.content}]`
+          : block.content,
       )
       .join("\n\n");
   }
@@ -637,20 +644,22 @@ export default function AdminPage() {
         <button
           type="button"
           onClick={() => setActiveTab("questions")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === "questions"
-            ? "bg-white text-indigo-600 shadow-sm"
-            : "text-slate-600 hover:text-slate-800"
-            }`}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            activeTab === "questions"
+              ? "bg-white text-indigo-600 shadow-sm"
+              : "text-slate-600 hover:text-slate-800"
+          }`}
         >
           Question Bank
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("users")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === "users"
-            ? "bg-white text-indigo-600 shadow-sm"
-            : "text-slate-600 hover:text-slate-800"
-            }`}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            activeTab === "users"
+              ? "bg-white text-indigo-600 shadow-sm"
+              : "text-slate-600 hover:text-slate-800"
+          }`}
         >
           User Management
         </button>
@@ -795,10 +804,11 @@ export default function AdminPage() {
                             setCreateError("");
                             setCreateMessage("");
                           }}
-                          className={`rounded-full px-3 py-1 text-sm transition ${selected
-                            ? "bg-indigo-600 text-white"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                            }`}
+                          className={`rounded-full px-3 py-1 text-sm transition ${
+                            selected
+                              ? "bg-indigo-600 text-white"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
                         >
                           {topic.name}
                         </button>
@@ -934,57 +944,57 @@ export default function AdminPage() {
                                 <div className="absolute right-0 z-10 mt-2 w-48 rounded-lg border border-slate-200 bg-white shadow-lg">
                                   {question.availability_status ===
                                     "available" && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditing(question)}
-                                          className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                                        >
-                                          Edit Question
-                                        </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => startEditing(question)}
+                                        className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                                      >
+                                        Edit Question
+                                      </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleArchiveQuestion(
-                                              question.question_number,
-                                            )
-                                          }
-                                          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
-                                        >
-                                          Archive Question
-                                        </button>
-                                      </>
-                                    )}
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleArchiveQuestion(
+                                            question.question_number,
+                                          )
+                                        }
+                                        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
+                                      >
+                                        Archive Question
+                                      </button>
+                                    </>
+                                  )}
 
                                   {question.availability_status ===
                                     "archived" && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleRestoreQuestion(
-                                              question.question_number,
-                                            )
-                                          }
-                                          className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                                        >
-                                          Restore Question
-                                        </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleRestoreQuestion(
+                                            question.question_number,
+                                          )
+                                        }
+                                        className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                                      >
+                                        Restore Question
+                                      </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleDeleteQuestion(
-                                              question.question_number,
-                                            )
-                                          }
-                                          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
-                                        >
-                                          Delete Question
-                                        </button>
-                                      </>
-                                    )}
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteQuestion(
+                                            question.question_number,
+                                          )
+                                        }
+                                        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
+                                      >
+                                        Delete Question
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -993,7 +1003,10 @@ export default function AdminPage() {
 
                         <div className="mt-3 space-y-4 text-sm text-slate-600">
                           {isExpanded ? (
-                            <QuestionDisplay question={question} showTitle={false} />
+                            <QuestionDisplay
+                              question={question}
+                              showTitle={false}
+                            />
                           ) : (
                             <div className="text-sm text-slate-600">
                               <ReactMarkdown
@@ -1003,18 +1016,26 @@ export default function AdminPage() {
                                   code({ className, children, ...props }) {
                                     const isInline = !className;
                                     return isInline ? (
-                                      <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                                      <code
+                                        className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-sm font-mono"
+                                        {...props}
+                                      >
                                         {children}
                                       </code>
                                     ) : (
-                                      <code className={className} {...props}>{children}</code>
+                                      <code className={className} {...props}>
+                                        {children}
+                                      </code>
                                     );
                                   },
                                 }}
                               >
                                 {(() => {
-                                  const preview = getQuestionTextPreview(question);
-                                  return preview.length > 220 ? `${preview.slice(0, 220)}...` : preview;
+                                  const preview =
+                                    getQuestionTextPreview(question);
+                                  return preview.length > 220
+                                    ? `${preview.slice(0, 220)}...`
+                                    : preview;
                                 })()}
                               </ReactMarkdown>
                             </div>
@@ -1166,10 +1187,11 @@ export default function AdminPage() {
                                         setEditError("");
                                         setEditMessage("");
                                       }}
-                                      className={`rounded-full px-3 py-1 text-sm transition ${selected
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                        }`}
+                                      className={`rounded-full px-3 py-1 text-sm transition ${
+                                        selected
+                                          ? "bg-indigo-600 text-white"
+                                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                      }`}
                                     >
                                       {topic.name}
                                     </button>
@@ -1306,10 +1328,11 @@ export default function AdminPage() {
 
                       <div className="flex items-center gap-3">
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${user.isAdmin
-                            ? "bg-green-100 text-green-700"
-                            : "bg-slate-200 text-slate-700"
-                            }`}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            user.isAdmin
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-200 text-slate-700"
+                          }`}
                         >
                           {user.isAdmin ? "Admin" : "User"}
                         </span>
@@ -1360,10 +1383,11 @@ export default function AdminPage() {
                 type="button"
                 onClick={handleConfirmModalAction}
                 disabled={confirmingAction}
-                className={`w-full rounded-xl px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60 ${confirmModal.confirmVariant === "red"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
+                className={`w-full rounded-xl px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+                  confirmModal.confirmVariant === "red"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
                 {confirmingAction ? "Processing..." : confirmModal.confirmText}
               </button>

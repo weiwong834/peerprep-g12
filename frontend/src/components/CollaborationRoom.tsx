@@ -1,4 +1,7 @@
-// This file was created with the help of chatgpt-5.4, ai was used to help with formatting edits and debugging
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT-5.4 Thinking), date: 2026-04-14
+// Scope: Assisted with formatting edits, mainly page overflow issue
+// Author review: I reviewed, modified, and tested the suggested changes before incorporating them into the file.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
 import { io, type Socket } from "socket.io-client";
@@ -297,9 +300,7 @@ export default function CollaborationRoom({
   useEffect(() => {
     async function fetchRemaining() {
       try {
-        const data = await getRemainingRequests(
-          session.session_id,
-        );
+        const data = await getRemainingRequests(session.session_id);
         setRemainingRequests(data.remainingRequests);
       } catch (err) {
         console.error("Failed to fetch remaining requests", err);

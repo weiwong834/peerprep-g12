@@ -1,4 +1,7 @@
-// This file was created with the help of chatgpt-5.4, ai was used to help with formatting edits and debugging
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT-5.4 Thinking), date: 2026-04-14
+// Scope: Assisted with formatting edits and debugging, including matching flow UI updates and modal/error-state handling.
+// Author review: I reviewed, modified, and tested the suggested changes before incorporating them into the file.
 import React, { useEffect, useRef, useState } from "react";
 import { MdOutlineDataArray } from "react-icons/md";
 import { VscSymbolString } from "react-icons/vsc";
