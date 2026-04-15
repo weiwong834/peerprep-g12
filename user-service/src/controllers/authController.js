@@ -627,7 +627,6 @@ export const deleteOwnAccount = async (req, res) => {
   const db = supabaseAdmin;
   const userId = req.userId;
 
-  // Get user role
   const { data: userProfile, error: userError } = await db
     .schema("userservice")
     .from("profiles")
@@ -665,7 +664,6 @@ export const deleteOwnAccount = async (req, res) => {
     }
   }
 
-  // Delete from profiles
   const { error: deleteProfileError } = await db
     .schema("userservice")
     .from("profiles")
@@ -679,7 +677,6 @@ export const deleteOwnAccount = async (req, res) => {
     });
   }
 
-  // Delete from Supabase Auth
   const { error: deleteAuthError } = await db.auth.admin.deleteUser(userId);
 
   if (deleteAuthError) {

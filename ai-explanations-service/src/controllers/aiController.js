@@ -10,6 +10,17 @@ const redis = new Redis({
 
 const MAX_REQUESTS = 5;
 
+
+/**
+ * Validates a JWT access token using Supabase.
+ *
+ * Returns:
+ * - User object if valid
+ * - null if invalid or expired
+ *
+ * @param {string} authorization - Authorization header (Bearer token)
+ * @returns {Object|null} Authenticated user or null
+ */
 const authenticateUser = async (authorization) => {
   const token = authorization.split(" ")[1];
 
@@ -34,6 +45,21 @@ const authenticateUser = async (authorization) => {
   return data.user;
 };
 
+
+/**
+ * Verifies that a session exists and that the user is part of it.
+ * 
+ * If validation fails:
+ * - Returns appropriate HTTP response via res
+ *
+ * If validation succeeds:
+ * - Returns session object
+ *
+ * @param {string} sessionId - Session ID
+ * @param {string} userId - Authenticated user ID
+ * @param {string} authorization - Authorization header
+ * @returns {Object} Session object if valid
+ */
 const validateSession = async (sessionId, userId, authorization) => {
   const sessionResult = await fetchSessionById(sessionId, authorization);
 
@@ -54,6 +80,16 @@ const validateSession = async (sessionId, userId, authorization) => {
   return { session };
 };
 
+
+/**
+ * Retrieves the number of remaining AI requests for a user in a session.
+ *
+ * Response:
+ * - remainingRequests (number of remaining hints)
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ */
 export const getRemainingRequests = async (req, res) => {
   const { sessionId } = req.params;
   const authorization = req.headers.authorization;
@@ -98,6 +134,17 @@ export const getRemainingRequests = async (req, res) => {
   }
 };
 
+
+/**
+ * Generates an AI explanation and updates request usage count.
+ *
+ * Response:
+ * - AI-generated explanation
+ * - Remaining request count
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ */
 export const handleExplain = async (req, res) => {
   const { sessionId } = req.params;
   const { type, question, code } = req.body;

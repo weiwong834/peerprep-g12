@@ -12,6 +12,22 @@ IMPORTANT RULES:
 - Give me a response that is strictly below 200 words
 `;
 
+/**
+ * Generates an AI explanation based on the request type.
+ *
+ * Supported types:
+ * - EXPLAIN_QUESTION: explains problem without solution
+ * - HINT: provides a single hint
+ * - EXPLAIN_CODE: explains given code
+ *
+ * Returns:
+ * - AI-generated explanation text
+ *
+ * @param {string} type - Type of explanation requested
+ * @param {string} question - Problem description
+ * @param {string} code - User's code (optional depending on type)
+ * @returns {string} Generated explanation
+ */
 export const generateExplanation = async (type, question, code) => {
   let prompt;
 
